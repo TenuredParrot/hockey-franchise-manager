@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Hockey Franchise Manager 0.1.1: run an NHL-style franchise. A 32-team league, trades, the draft and free agency. Test build.">
+<meta name="description" content="Hockey Franchise Manager 0.2.0: run an NHL-style franchise. A 32-team league, trades, the draft and free agency. Test build.">
 <meta name="theme-color" content="#121821">
-<meta name="hfm-build" content="0.1.1 · built 2026-11-11 15:57 MST · e975ae8068 · save format v6">
+<meta name="hfm-build" content="0.2.0 · built 2026-11-11 16:29 MST · 1f3e35a552 · save format v6">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%231d4f9a'/><circle cx='32' cy='32' r='21' fill='none' stroke='%23c8102e' stroke-width='4'/><ellipse cx='32' cy='36' rx='14' ry='5.5' fill='%23111316'/><rect x='18' y='30' width='28' height='6' fill='%23111316'/><ellipse cx='32' cy='30' rx='14' ry='5.5' fill='%233b4049'/></svg>">
-<title>Hockey Franchise Manager 0.1.1</title>
+<title>Hockey Franchise Manager 0.2.0</title>
 <script>
   // Collected for the headless UI smoke test (tests/browser/ui_smoke.js).
   window.__uiErrors = [];
@@ -221,7 +221,30 @@
   .field { display: grid; gap: 4px; }
   .field input { padding: 6px 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); }
 
+  /* Live games (0.2.0) */
+  .live { display: grid; gap: 14px; }
+  .lboard { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; }
+  .lteam { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .lteam.mine .lname b { color: var(--accent); }
+  .lteam:last-child { flex-direction: row-reverse; text-align: right; }
+  .lname { display: grid; gap: 2px; min-width: 0; justify-items: start; }
+  .lteam:last-child .lname { justify-items: end; }
+  .lscore { font-size: 44px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; margin-left: auto; padding: 0 6px; }
+  .lteam:last-child .lscore { margin-left: 0; margin-right: auto; }
+  .lmid { display: grid; justify-items: center; gap: 5px; text-align: center; min-width: 150px; }
+  .lclock { font-size: 14px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .lclock b { font-size: 24px; color: var(--ink); }
+  .live-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 470px), 1fr)); align-items: start; }
+  .slot.onice { border-color: var(--good); box-shadow: inset 3px 0 0 var(--good); }
+  .slot:disabled { cursor: default; }
+  .gl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   @media (max-width: 640px) {
+    .lboard { grid-template-columns: 1fr; gap: 8px; }
+    .lteam:last-child { flex-direction: row; text-align: left; }
+    .lteam:last-child .lname { justify-items: start; }
+    .lteam:last-child .lscore { margin-left: auto; margin-right: 0; }
+    .lmid { order: 3; justify-items: start; text-align: left; min-width: 0; }
+    .lscore { font-size: 34px; }
     main { padding: 12px 16px; }
     .simbar { margin-left: 0; width: 100%; }
     .busy { min-width: 0; }
@@ -572,6 +595,8 @@ const CONFIG = deepFreeze({
     goalieForm: { sd: 5, base: 1.5 },                       // per-game sd = sd · (base − consistency/100)
     faceoff: { k: 0.004, min: 0.3, max: 0.7, winBoost: 1.03 },
     shares: { F: [0.31, 0.28, 0.23, 0.18], D: [0.38, 0.33, 0.29], PP: [0.72, 0.28], PK: [0.60, 0.40], otD: [0.6, 0.4] },
+    // Line usage a coach can choose in a live game (balanced = the shares above).
+    usage: { balanced: null, top: { F: [0.38, 0.31, 0.20, 0.11], D: [0.44, 0.34, 0.22] }, roll: { F: [0.27, 0.26, 0.24, 0.23], D: [0.35, 0.33, 0.32] } },
     otMinutes: 5,
     shootout: { rounds: 3, base: 0.32, kShooter: 0.025, kGoalie: 0.02 },
     xg: { evMinutes: 49, ppMinutes: 5.5 },                  // closed-form win probability (§3.3)
@@ -2051,7 +2076,11 @@ const Sim = (() => {
   }
 
   // ── the engine ────────────────────────────────────────────────────────────
-  function simulate(ctx, rng) {
+  // A match advances one minute at a time (or the whole shootout) with step(). simulate() steps to the end at once;
+  // a live game (0.2.0) steps on a clock, and between minutes the coach can change lines (replaceSide), switch
+  // goalies, pull the goalie or change line usage. With no coaching the random draws happen in exactly the order
+  // they always have, so simmed results are unchanged by the live mode.
+  function createMatch(ctx, rng) {
     const N = ctx.norms, T = [ctx.home, ctx.away];
     const goals = [0, 0], pen = [0, 0];                     // pen[i] = minutes team i is short-handed
     const shots = [[0, 0, 0], [0, 0, 0]];                   // by period; overtime periods are appended
@@ -2062,9 +2091,14 @@ const Sim = (() => {
       return x;
     };
     T.forEach((t, i) => t.dressed.forEach(id => { line(id).side = i; }));
-    const gl = T.map((t, i) => ({ id: t.goalie.id, side: i, sa: 0, ga: 0, toi: 0, decision: null, so: 0 }));
-    const form = T.map(t => t.goalie.rating + rng.normal() * S.goalieForm.sd * (S.goalieForm.base - t.goalie.consistency / 100));
+    const gl = T.map((t, i) => ({ id: t.goalie.id, side: i, sa: 0, ga: 0, toi: 0, decision: null, so: 0, started: true }));
+    const active = [gl[0], gl[1]];                          // the goalie stat line in net for each side
+    const gameForm = t => t.goalie.rating + rng.normal() * S.goalieForm.sd * (S.goalieForm.base - t.goalie.consistency / 100);
+    const form = T.map(gameForm);
     const goalList = [], penList = [];
+    const coach = [{ pull: 'auto', usage: 'balanced' }, { pull: 'auto', usage: 'balanced' }];
+    let minute = 0, stage = 'REG', decidedIn = 'REG', shootout = null, last = null;
+    const otEnd = 60 + (ctx.playoff ? CONFIG.playoffs.otPeriodMinutes * CONFIG.playoffs.maxOtPeriods : S.otMinutes);
 
     function deploy(t, i, pp, ot) {
       if (ot) {
@@ -2074,20 +2108,23 @@ const Sim = (() => {
       }
       if (pp === i) return t.pp[rng.weightedIndex(S.shares.PP)];
       if (pp === 1 - i) return t.pk[rng.weightedIndex(S.shares.PK)];
-      return t.ev[rng.weightedIndex(S.shares.F)][rng.weightedIndex(S.shares.D)];
+      return t.ev[rng.weightedIndex(t.sharesF || S.shares.F)][rng.weightedIndex(t.sharesD || S.shares.D)];
     }
 
     // mode: 'REG' (regulation), 'OT3' (regular-season 3-on-3), 'OT5' (playoff 5-on-5). Overtime is sudden death.
+    // Returns true when a sudden-death goal ends the game. `last` records the minute for a live display.
     function tick(m, mode) {
       const ot = mode === 'OT3', sudden = mode !== 'REG';
       const pp = (pen[0] > 0) !== (pen[1] > 0) ? (pen[0] > 0 ? 1 : 0) : -1;   // team on the PP, or −1
       const Un = T.map((t, i) => deploy(t, i, pp, ot));
       const lead = goals[0] - goals[1];
-      const pulled = mode === 'REG' && m >= S.pull.fromMinute && Math.abs(lead) >= 1 && Math.abs(lead) <= S.pull.maxDeficit ? (lead > 0 ? 1 : 0) : -1;
+      const auto = mode === 'REG' && m >= S.pull.fromMinute && Math.abs(lead) >= 1 && Math.abs(lead) <= S.pull.maxDeficit ? (lead > 0 ? 1 : 0) : -1;
+      const pulled = [0, 1].map(i => (coach[i].pull === 'pull' ? true : coach[i].pull === 'in' ? false : auto === i));
       const period = mode === 'REG' ? Math.floor(m / 20) : mode === 'OT3' ? 3 : 3 + Math.floor((m - 60) / CONFIG.playoffs.otPeriodMinutes);
       while (shots[0].length <= period) { shots[0].push(0); shots[1].push(0); }
+      const rec = last = { minute: m, mode, period: period + 1, pp, pulled: pulled.slice(), onIce: Un.map(u => u.skaters.map(e => e.id)), shots: [], ended: false };
       for (let i = 0; i < 2; i++) {
-        if (pulled !== i) gl[i].toi += 60;
+        if (!pulled[i]) active[i].toi += 60;
         for (const e of Un[i].skaters) line(e.id).toi += 60;
       }
       // Faceoff: the winner gets a slightly better minute.
@@ -2105,23 +2142,25 @@ const Sim = (() => {
           const d = goals[i] - goals[j], E = S.scoreEffects;
           lam *= d < 0 ? 1 + E.trail * Math.min(E.cap, -d) : d > 0 ? 1 - E.lead * Math.min(E.cap, d) : 1;
         }
-        if (pulled === i) lam *= S.pull.mult;
-        const n = rng.poisson(lam) + (pulled === j ? rng.poisson(S.pull.enShots) : 0);
+        if (pulled[i]) lam *= S.pull.mult;
+        const n = rng.poisson(lam) + (pulled[j] ? rng.poisson(S.pull.enShots) : 0);
         for (let k = 0; k < n; k++) {
           const shooter = rng.weighted(att.skaters, e => e.shootW);
           const mates = att.skaters.filter(e => e !== shooter);
           line(shooter.id).sog++;
           shots[i][period]++;
+          const shot = { side: i, shooter: shooter.id, goal: null };
+          rec.shots.push(shot);
           let scored;
-          if (pulled === j) {
+          if (pulled[j]) {
             scored = rng.next() < S.pull.enP;                // empty net: no goalie stats
           } else {
-            gl[j].sa++;
+            active[j].sa++;
             const pGoal = S.baseSh * S.finish[st] * (shooter.isD ? S.dFinish : 1)
               * Math.exp(S.kShooter * (shotQ(shooter, att.skaters) - N.sq))
               * Math.exp(-S.kGoalie * (form[j] - N.g));
             scored = rng.next() < pGoal;
-            if (scored) gl[j].ga++;
+            if (scored) active[j].ga++;
           }
           if (!scored) continue;
           goals[i]++;
@@ -2130,7 +2169,7 @@ const Sim = (() => {
           const rest = a1 ? mates.filter(e => e !== a1) : [];
           const a2 = a1 && rest.length && rng.next() < S.pA2 ? rng.weighted(rest, e => e.passW * (e.isD ? S.dA2W : 1)) : null;
           for (const a of [a1, a2]) if (a) line(a.id).a++;
-          const strength = pulled === j ? 'EN' : st === 'OT' ? 'EV' : st;
+          const strength = pulled[j] ? 'EN' : st === 'OT' ? 'EV' : st;
           if (st === 'PP') {
             line(shooter.id).ppg++; for (const a of [a1, a2]) if (a) line(a.id).ppa++;
             pen[j] = 0;                                     // a PP goal ends the minor
@@ -2139,9 +2178,11 @@ const Sim = (() => {
             for (const e of att.skaters) line(e.id).pm++;
             for (const e of dfd.skaters) line(e.id).pm--;
           }
-          goalList.push({ period: period + 1, sec: m * 60 + rng.int(m === 0 ? 8 : 1, 59), side: i, scorer: shooter.id,
-                          a1: a1 ? a1.id : null, a2: a2 ? a2.id : null, strength });
-          if (sudden) return true;                          // sudden death
+          const goal = { period: period + 1, sec: m * 60 + rng.int(m === 0 ? 8 : 1, 59), side: i, scorer: shooter.id,
+                         a1: a1 ? a1.id : null, a2: a2 ? a2.id : null, strength };
+          goalList.push(goal);
+          shot.goal = goal;
+          if (sudden) { rec.ended = true; return true; }    // sudden death
         }
       }
       for (let i = 0; i < 2; i++) if (pen[i] > 0) pen[i]--;
@@ -2158,42 +2199,103 @@ const Sim = (() => {
       return false;
     }
 
-    for (let m = 0; m < 60; m++) tick(m, 'REG');
-    let decidedIn = 'REG', shootout = null;
-    if (goals[0] === goals[1]) {
-      decidedIn = 'OT';
-      if (ctx.playoff) {                                    // penalties carry over; play until someone scores
-        const end = 60 + CONFIG.playoffs.otPeriodMinutes * CONFIG.playoffs.maxOtPeriods;
-        let m = 60;
-        while (m < end && !tick(m, 'OT5')) m++;
-        if (goals[0] === goals[1]) throw new Error('Playoff game exceeded the overtime limit');
-      } else {
-        pen[0] = pen[1] = 0;
-        for (let m = 60; m < 60 + S.otMinutes; m++) if (tick(m, 'OT3')) break;
-        if (goals[0] === goals[1]) { decidedIn = 'SO'; shootout = runShootout(T, N, rng); }
+    // One step: a minute of regulation or overtime, or the shootout. Returns the minute's record (null for the
+    // shootout or once the game is over).
+    function step() {
+      if (stage === 'FINAL') return null;
+      if (stage === 'SO') { shootout = runShootout(T, N, rng); stage = 'FINAL'; return null; }
+      if (stage === 'REG') {
+        tick(minute, 'REG');
+        minute++;
+        if (minute === 60) {
+          if (goals[0] !== goals[1]) stage = 'FINAL';
+          else { decidedIn = 'OT'; stage = 'OT'; if (!ctx.playoff) pen[0] = pen[1] = 0; }   // regular-season OT starts clean
+        }
+        return last;
       }
+      const scored = tick(minute, ctx.playoff ? 'OT5' : 'OT3');   // overtime: penalties carry over in the playoffs
+      minute++;
+      if (scored) stage = 'FINAL';
+      else if (minute >= otEnd) {
+        if (ctx.playoff) throw new Error('Playoff game exceeded the overtime limit');
+        decidedIn = 'SO'; stage = 'SO';
+      }
+      return last;
     }
-    const winner = decidedIn === 'SO' ? shootout.winner : goals[0] > goals[1] ? 0 : 1;
-    const score = [goals[0] + (decidedIn === 'SO' && winner === 0 ? 1 : 0), goals[1] + (decidedIn === 'SO' && winner === 1 ? 1 : 0)];
 
-    goalList.sort((a, b) => a.sec - b.sec);
-    if (decidedIn !== 'SO') {                               // GWG: the winner's goal that broke the loser's final total
-      const gw = goalList.filter(g => g.side === winner)[goals[1 - winner]];
-      if (gw) line(gw.scorer).gwg++;
+    function finish() {
+      if (stage !== 'FINAL') throw new Error('The game is not over');
+      const winner = decidedIn === 'SO' ? shootout.winner : goals[0] > goals[1] ? 0 : 1;
+      const score = [goals[0] + (decidedIn === 'SO' && winner === 0 ? 1 : 0), goals[1] + (decidedIn === 'SO' && winner === 1 ? 1 : 0)];
+      const goalList2 = goalList.slice().sort((a, b) => a.sec - b.sec);
+      if (decidedIn !== 'SO') {                               // GWG: the winner's goal that broke the loser's final total
+        const gw = goalList2.filter(g => g.side === winner)[goals[1 - winner]];
+        if (gw) line(gw.scorer).gwg++;
+      }
+      // The decision goes to the goalie who played most for his side (the starter, unless he was replaced early); a
+      // shutout only counts when one goalie played the whole game.
+      const sideG = i => gl.filter(g => g.side === i), ofRecord = i => sideG(i).reduce((b, g) => (g.toi > b.toi ? g : b));
+      ofRecord(winner).decision = 'W';
+      ofRecord(1 - winner).decision = decidedIn === 'REG' || ctx.playoff ? 'L' : 'OTL';
+      if (goals[1 - winner] === 0 && sideG(winner).length === 1) ofRecord(winner).so = 1;
+
+      const skaters = {};
+      for (const [id, x] of lines) skaters[id] = x;
+      const starScore = id => { const x = skaters[id]; return 3 * x.g + 2 * x.a + 0.15 * x.sog + 0.5 * x.gwg; };
+      const goalieScore = g => 0.12 * (g.sa - g.ga) - g.ga + (g.decision === 'W' ? 1.5 : 0) + (g.so ? 3 : 0);
+      const stars = [...Object.keys(skaters).map(id => [id, starScore(id)]), ...gl.map(g => [g.id, goalieScore(g)])]
+        .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, 3).map(x => x[0]);
+
+      return { homeId: ctx.home.teamId, awayId: ctx.away.teamId, score, decidedIn, winner, playoff: !!ctx.playoff,
+               otPeriods: Math.max(0, shots[0].length - 3), shots, goals: goalList2, penalties: penList.sort((a, b) => a.sec - b.sec), skaters, goalies: gl, shootout, stars };
     }
-    gl[winner].decision = 'W';
-    gl[1 - winner].decision = decidedIn === 'REG' || ctx.playoff ? 'L' : 'OTL';
-    if (goals[1 - winner] === 0) gl[winner].so = 1;
 
-    const skaters = {};
-    for (const [id, x] of lines) skaters[id] = x;
-    const starScore = id => { const x = skaters[id]; return 3 * x.g + 2 * x.a + 0.15 * x.sog + 0.5 * x.gwg; };
-    const goalieScore = g => 0.12 * (g.sa - g.ga) - g.ga + (g.decision === 'W' ? 1.5 : 0) + (g.so ? 3 : 0);
-    const stars = [...Object.keys(skaters).map(id => [id, starScore(id)]), ...gl.map(g => [g.id, goalieScore(g)])]
-      .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, 3).map(x => x[0]);
+    // ── coaching (live games) ──
+    // New lines for side i (rebuilt with buildSide after the coach's change); the goalie in net stays.
+    function replaceSide(i, side) {
+      const keep = T[i];
+      T[i] = { ...side, goalie: keep.goalie, backupId: keep.backupId, sharesF: keep.sharesF, sharesD: keep.sharesD };
+      side.dressed.forEach(id => { line(id).side = i; });
+    }
+    // Put another goalie in net for side i: { id, rating, consistency }. He gets his own stat line and game form.
+    function switchGoalie(i, goalie) {
+      if (goalie.id === T[i].goalie.id) return;
+      const old = T[i].goalie.id;
+      T[i] = { ...T[i], goalie, backupId: old };
+      active[i] = gl.find(g => g.id === goalie.id) || (gl.push({ id: goalie.id, side: i, sa: 0, ga: 0, toi: 0, decision: null, so: 0, started: false }), gl[gl.length - 1]);
+      form[i] = gameForm(T[i]);
+    }
+    const setPull = (i, mode) => { if (!['auto', 'pull', 'in'].includes(mode)) throw new Error(`Unknown goalie mode "${mode}"`); coach[i].pull = mode; };
+    function setUsage(i, usage) {
+      if (!(usage in S.usage)) throw new Error(`Unknown line usage "${usage}"`);
+      const u = S.usage[usage];
+      coach[i].usage = usage;
+      T[i] = { ...T[i], sharesF: usage === 'balanced' ? undefined : u.F, sharesD: usage === 'balanced' ? undefined : u.D };
+    }
+    // Everything a live display needs, as plain copies.
+    function snapshot() {
+      return {
+        stage, minute, decidedIn, goals: goals.slice(), shots: shots.map(p => p.slice()), pen: pen.slice(),
+        goalies: gl.map(g => ({ ...g })), inNet: active.map(g => g.id), coach: coach.map(c => ({ ...c })),
+        skaters: Object.fromEntries([...lines].map(([id, x]) => [id, { ...x }])),
+        goalList: goalList.map(g => ({ ...g })), penList: penList.map(p => ({ ...p })), shootout: shootout && { ...shootout, attempts: shootout.attempts.slice() },
+      };
+    }
 
-    return { homeId: ctx.home.teamId, awayId: ctx.away.teamId, score, decidedIn, winner, playoff: !!ctx.playoff,
-             otPeriods: Math.max(0, shots[0].length - 3), shots, goals: goalList, penalties: penList.sort((a, b) => a.sec - b.sec), skaters, goalies: gl, shootout, stars };
+    return {
+      step, finish, snapshot, replaceSide, switchGoalie, setPull, setUsage,
+      get done() { return stage === 'FINAL'; },
+      get stage() { return stage; },
+      get minute() { return minute; },
+      get last() { return last; },
+      playoff: !!ctx.playoff, sides: T,
+    };
+  }
+
+  function simulate(ctx, rng) {
+    const m = createMatch(ctx, rng);
+    while (!m.done) m.step();
+    return m.finish();
   }
 
   function runShootout(T, N, rng) {
@@ -2260,7 +2362,7 @@ const Sim = (() => {
     return n;
   }
 
-  return { perf, effSkater, buildSide, aggregates, computeNorms, ensureNorms, simulate, winProbability, playGame, playDate, playThrough };
+  return { perf, effSkater, buildSide, aggregates, computeNorms, ensureNorms, createMatch, simulate, winProbability, playGame, playDate, playThrough };
 })();
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -2328,7 +2430,7 @@ const Stats = (() => {
       s.players[x.id].condition.lastPlayed = g.date;
       if (countsForCareer) s.players[x.id].career.nhlGP++;
       const L = lineFor(s.players[x.id], g.season, teamIds[x.side], g.league, g.type);
-      L.gp++; L.gs++; L.sa += x.sa; L.ga += x.ga; L.toiSec += x.toi; L.so += x.so;
+      L.gp++; if (x.started !== false) L.gs++; L.sa += x.sa; L.ga += x.ga; L.toiSec += x.toi; L.so += x.so;   // a reliever plays but doesn't start
       if (x.decision === 'W') L.w++; else if (x.decision === 'L') L.l++; else if (x.decision === 'OTL') L.otl++;
     }
     if (g.type === 'REG') {                                 // playoff games live in the series, not the standings
@@ -4100,7 +4202,9 @@ const Season = (() => {
   const userPicks = s => (s.draft ? s.draft.picks.filter(pk => !pk.playerId && Draft.ownerOf(s, pk) === s.meta.userTeamId).map(pk => pk.overall) : []);
 
   // ── "Advance 1 Day" (BLUEPRINT §2.2) ──────────────────────────────────────
-  function advanceDay(s, rng) {
+  // A day runs in two halves so the user's game can be played live in between (0.2.0): startDay() is the morning
+  // and the legality gate; finishDay() plays the games, then the night. advanceDay() is both at once.
+  function startDay(s, rng) {
     const today = s.calendar.date, phase = s.calendar.phase;
     const events = [];
     // 1. Morning: in-season roster moves (waivers, IR, call-ups, tryouts) for every org; the draft; free agency.
@@ -4109,7 +4213,7 @@ const Season = (() => {
       const { userOnClock } = Draft.run(s, events);
       if (userOnClock) {
         const messages = post(s, events), pk = Draft.current(s);
-        return { ok: false, date: today, needs: 'DRAFT', blockers: [`You're on the clock with pick #${pk.overall} (round ${pk.round}): make your selection on the Draft page`], played: [], messages, interrupts: messages.filter(m => m.interrupt) };
+        return { result: { ok: false, date: today, needs: 'DRAFT', blockers: [`You're on the clock with pick #${pk.overall} (round ${pk.round}): make your selection on the Draft page`], played: [], messages, interrupts: messages.filter(m => m.interrupt) } };
       }
     }
     Market.tick(s, rng, today, events);
@@ -4119,12 +4223,20 @@ const Season = (() => {
     const todays = (s.scheduleByDate[today] || []).map(id => s.games[id]).filter(g => !g.played);
     if (todays.some(g => g.homeId === user || g.awayId === user)) {
       const blockers = Roster.problems(s, user);
-      if (blockers.length) { const messages = post(s, events); return { ok: false, date: today, blockers, played: [], messages, interrupts: messages.filter(m => m.interrupt) }; }
+      if (blockers.length) { const messages = post(s, events); return { result: { ok: false, date: today, blockers, played: [], messages, interrupts: messages.filter(m => m.interrupt) } }; }
     }
+    return { result: null, today, events, todays };
+  }
+
+  // `boxes` holds games already played (the user's live game): they're recorded instead of simulated.
+  function finishDay(s, rng, day, boxes = {}) {
+    const { today, events, todays } = day;
     // 2. Games.
     const played = [], playedToday = new Set();
     for (const g of todays) {
-      const box = Sim.playGame(s, g.id, rng);
+      let box = boxes[g.id];
+      if (box) Stats.applyBoxScore(s, g, box);
+      else box = Sim.playGame(s, g.id, rng);
       Condition.afterGame(s, g, box, rng, events);
       Records.afterGame(s, g, box, events);       // feats, milestones, records, streaks (Phase 6)
       for (const id of Object.keys(box.skaters)) playedToday.add(id);
@@ -4145,7 +4257,12 @@ const Season = (() => {
     return { ok: true, date: today, played, messages, interrupts: messages.filter(m => m.interrupt) };
   }
 
-  return { PHASES, LABELS, IN_SEASON, regularSeasonDone, checkTransition, advanceDay, post, seasonLabel, userPicks };
+  function advanceDay(s, rng) {
+    const day = startDay(s, rng);
+    return day.result || finishDay(s, rng, day);
+  }
+
+  return { PHASES, LABELS, IN_SEASON, regularSeasonDone, checkTransition, startDay, finishDay, advanceDay, post, seasonLabel, userPicks };
 })();
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -5327,7 +5444,7 @@ const Game = {
     return s;
   },
 
-  _attach(s) { Game.state = s; Game.rng = RNG.bind(s.meta); },
+  _attach(s) { Game.state = s; Game.rng = RNG.bind(s.meta); Game.live = null; },
   _require() { if (!Game.state) throw new Error('No game loaded'); return Game.state; },
 
   // ── the loop ──
@@ -5356,6 +5473,73 @@ const Game = {
     return Game.simUntil(res => res.played.some(id => { const g = Game.state.games[id]; return g.homeId === user || g.awayId === user; }), opts);
   },
   simToPhaseEnd(opts) { const phase = Game._require().calendar.phase; return Game.simUntil((res, s) => s.calendar.phase !== phase, opts); },
+
+  // ── live games (0.2.0): your NHL game played minute by minute, coaching between minutes ──
+  // The day's morning runs first (Season.startDay); your game is then stepped by the caller (the UI's clock) and,
+  // once it's over, finishLiveGame() records it and plays the rest of the day. Game.live lives in memory only: a
+  // live game isn't saved, so reloading mid-game leaves it unplayed. It draws from its own random stream (seeded by
+  // the league and the game), so watching never shifts the rest of the season's draws.
+  live: null,
+  userGameToday() {
+    const s = Game._require(), user = s.meta.userTeamId;
+    return (s.scheduleByDate[s.calendar.date] || []).map(id => s.games[id])
+      .find(g => !g.played && g.league === 'NHL' && (g.homeId === user || g.awayId === user)) || null;
+  },
+  // Returns { ok: true, live } or, if the morning blocks the game (an illegal roster…), advanceDay's { ok: false, … }.
+  startLiveGame() {
+    const s = Game._require();
+    if (Game.live) return { ok: true, live: Game.live };
+    const g = Game.userGameToday();
+    if (!g) throw new Error('Your team has no game today');
+    const day = Season.startDay(s, Game.rng);
+    if (day.result) { Bus.emit('day:advanced', day.result); return day.result; }
+    const norms = Sim.ensureNorms(s, g.league, g.date);
+    const home = Sim.buildSide(s, g.homeId, g.date, g.type), away = Sim.buildSide(s, g.awayId, g.date, g.type);
+    const rng = RNG.bind({ rngState: U.hashString(`${s.meta.seed}:${g.id}:live`) });
+    const match = Sim.createMatch({ norms, playoff: g.type === 'PO', home, away }, rng);
+    const side = g.homeId === s.meta.userTeamId ? 0 : 1;
+    Game.live = { gameId: g.id, date: g.date, type: g.type, side, match, day, dressed: new Set(match.sides[side].dressed) };
+    Bus.emit('live:started', { gameId: g.id });
+    return { ok: true, live: Game.live };
+  },
+  _live() { if (!Game.live) throw new Error('No live game in progress'); return Game.live; },
+  liveStep() { return Game._live().match.step(); },
+  liveSimToEnd() { const m = Game._live().match; while (!m.done) m.step(); },
+  // New lines from the next minute: only the players dressed for this game, rearranged. Kept for later games too,
+  // like any change on the Lines page.
+  liveSetLines({ F, D }) {
+    const s = Game._require(), L = Game._live(), user = s.meta.userTeamId, ids = [...F.flat(), ...D.flat()];
+    if (ids.length !== L.dressed.size || new Set(ids).size !== ids.length || ids.some(id => !L.dressed.has(id))) {
+      return { ok: false, problems: ['During a game you can only rearrange the players who dressed for it'] };
+    }
+    const res = Lineup.manual(s, user, { F, D, G: s.teams[user].lineup.G });
+    if (!res.ok) return res;
+    L.match.replaceSide(L.side, Sim.buildSide(s, user, L.date, L.type));
+    Bus.emit('lines:changed', { teamId: user });
+    return res;
+  },
+  // 'auto' (pull when trailing late, as AI coaches do), 'pull' (extra attacker now), 'in' (never pull).
+  livePullGoalie(mode) { const L = Game._live(); L.match.setPull(L.side, mode); },
+  // 'balanced', 'top' (lean on your top lines) or 'roll' (roll all four).
+  liveLineUsage(usage) { const L = Game._live(); L.match.setUsage(L.side, usage); },
+  // Put the other dressed goalie in net. Returns his id.
+  liveSwitchGoalie() {
+    const s = Game._require(), L = Game._live(), id = L.match.sides[L.side].backupId;
+    if (!id) throw new Error('No other goalie is dressed');
+    const p = s.players[id];
+    L.match.switchGoalie(L.side, { id, rating: Ratings.goalie(p) * Sim.perf(p), consistency: p.dev.consistency });
+    return id;
+  },
+  // Record the finished game and play the rest of the day. Returns advanceDay's result.
+  finishLiveGame() {
+    const s = Game._require(), L = Game._live();
+    if (!L.match.done) throw new Error('The game is not over');
+    const box = L.match.finish();
+    Game.live = null;
+    const res = Season.finishDay(s, Game.rng, L.day, { [L.gameId]: box });
+    Bus.emit('day:advanced', res);
+    return res;
+  },
 
   // ── user commands ──
   callUp(playerId) { const s = Game._require(); const p = Roster.callUp(s, playerId, s.calendar.date); Roster.refreshLines(s, p.teamId); Bus.emit('roster:changed', { playerId }); return p; },
@@ -5644,8 +5828,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
     if (offseason()) status = `${seasonLabel(statSeason())}: ${status}`;
     const sims = {
       PRESEASON: [b('day', 'Advance day', true), b('phase', 'Sim to opening night')],
-      REGULAR_SEASON: [b('day', 'Advance day', true), b('next', 'Play next game'), b('week', 'Sim week'), b('month', 'Sim month'), b('phase', 'Sim to playoffs')],
-      PLAYOFFS: [b('day', 'Advance day', true), b('next', 'Play next game'), b('phase', 'Sim playoffs')],
+      REGULAR_SEASON: [b('day', 'Advance day', true), b('live', 'Play next game live'), b('next', 'Sim next game'), b('week', 'Sim week'), b('month', 'Sim month'), b('phase', 'Sim to playoffs')],
+      PLAYOFFS: [b('day', 'Advance day', true), b('live', 'Play next game live'), b('next', 'Sim next game'), b('phase', 'Sim playoffs')],
       SEASON_END: [b('day', 'Advance day', true), b('phase', 'Sim to the draft')],
       DRAFT: Draft.userOnClock(s) ? [`<button class="btn primary" data-act="view" data-view="draft"${ui.busy ? ' disabled' : ''}>You're on the clock →</button>`] : [b('day', 'Continue the draft', true)],
       RE_SIGNING: [b('day', 'Advance day', true), b('week', 'Sim week'), b('phase', 'Sim to free agency')],
@@ -5656,9 +5840,9 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
       <div class="when"><b>${esc(fmtDate(s.calendar.date, { year: 'numeric' }))}</b><span>${esc(PHASE_LABEL[phase])}</span></div>
       <div class="simbar">
         ${ui.busy ? `<span class="busy">Simulating… ${esc(ui.progress)}</span>` : ''}
-        ${sims.join('')}
-        <button class="btn" data-act="saves"${ui.busy ? ' disabled' : ''}>Save / Load</button>
-        <button class="btn" data-act="new-game"${ui.busy ? ' disabled' : ''}>New game</button>
+        ${Game.live ? `<span class="busy">Live: ${esc(team(Game.live.match.sides[1].teamId).abbrev)} @ ${esc(team(Game.live.match.sides[0].teamId).abbrev)}</span>` : sims.join('')}
+        <button class="btn" data-act="saves"${ui.busy || Game.live ? ' disabled' : ''}>Save / Load</button>
+        <button class="btn" data-act="new-game"${ui.busy || Game.live ? ' disabled' : ''}>New game</button>
       </div>
     </div></header>`;
   }
@@ -5667,6 +5851,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
                 ['leaders', 'Leaders'], ['playoffs', 'Playoffs'], ['draft', 'Draft'], ['contracts', 'Contracts'], ['market', 'Free agents'], ['trade', 'Trades'], ['news', 'News'],
                 ['history', 'History'], ['inbox', 'Inbox']];
   function tabsHTML() {
+    if (Game.live) return '';
     const s = S(), unread = s.inbox.filter(m => !m.read).length;
     const counts = { inbox: unread, draft: Draft.userOnClock(s) ? '!' : 0, market: s.pending.faOffers.filter(o => o.teamId === user()).length, trade: s.pending.tradeOffers.length,
                      contracts: ['SEASON_END', 'DRAFT', 'RE_SIGNING'].includes(s.calendar.phase) ? expiring().length : 0 };
@@ -5700,7 +5885,9 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
         ${mine === null ? '<p class="muted small">Win chance unavailable (a lineup is incomplete).</p>' : `
         <div class="prob"><i style="width:${(mine * 100).toFixed(1)}%;background:${team(me).colors.primary}"></i><i style="flex:1;background:${team(opp).colors.primary}"></i></div>
         <div class="small muted">Win chance <b style="color:var(--ink)">${Math.round(mine * 100)}%</b> · expected goals ${(home ? wp.xgHome : wp.xgAway).toFixed(1)}–${(home ? wp.xgAway : wp.xgHome).toFixed(1)}</div>`}
-        <div style="margin-top:10px"><button class="btn primary" data-act="sim" data-kind="next"${ui.busy ? ' disabled' : ''}>Play next game</button></div></div>`);
+        <div class="toolbar" style="margin:10px 0 0"><button class="btn primary" data-act="sim" data-kind="live"${ui.busy ? ' disabled' : ''}>Play it live</button>
+          <button class="btn" data-act="sim" data-kind="next"${ui.busy ? ' disabled' : ''}>Sim it</button>
+          <span class="muted small">Live: watch it on a clock and coach: lines, goalie, pace.</span></div></div>`);
     } else if (!offseason()) {
       const sr = s.playoffs && Playoffs.seriesOf(s, me);
       cards.push(`<div class="card"><h2>Next game</h2><p class="muted">${sr && sr.loser === me ? 'You were eliminated. The playoffs continue without you.' : s.playoffs && !sr ? 'You missed the playoffs. The postseason continues without you.' : 'No game scheduled yet.'}</p></div>`);
@@ -6689,14 +6876,325 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
   }
 
   // ════════════════════════════════════════════════════════════════════════
+  // Live games (0.2.0): your game on a clock, with coaching
+  // ════════════════════════════════════════════════════════════════════════
+  // The engine computes a minute as the clock enters it (Game.liveStep). Its goals and penalties appear when the
+  // clock reaches their second and its shots are spread across the minute; player stats move on when the minute is
+  // over, so nothing shows before it happens. Coaching changes count from the next minute. Speed is game seconds
+  // per real second; between periods there are 5 real seconds of intermission.
+  const LIVE_SPEEDS = [[30, '30 sec/s'], [60, '1 min/s'], [120, '2 min/s'], [180, '3 min/s']];
+  const INTERMISSION = 5;
+  let liveTimer = null;
+  const LV = () => ui.live;
+  const periodName = n => (n <= 3 ? `${ordinal(n)} period` : !LV().playoff ? 'overtime' : `${ordinal(n - 3)} overtime`);
+  const periodEnd = n => (n <= 3 ? n * 1200 : LV().playoff ? 3600 + (n - 3) * 1200 : 3900);
+  const periodStart = n => (n <= 3 ? (n - 1) * 1200 : LV().playoff ? 3600 + (n - 4) * 1200 : 3600);
+  const clockText = sec => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;   // a running clock rounds down
+  const pLabel = n => (n <= 3 ? ['1st', '2nd', '3rd'][n - 1] : LV().playoff ? `${ordinal(n - 3)} OT` : 'OT');
+  const sideTeam = i => (i === 0 ? LV().home : LV().away);
+
+  // Play your next game live: sim to its day first (stopping for news, like "Sim next game"), then start the clock.
+  async function startLive() {
+    if (ui.busy || !S() || Game.live) return;
+    const next = Calendar.teamGames(S(), user()).find(g => !g.played && g.league === 'NHL');
+    if (!next) { toast('No game is scheduled for your team.'); return; }
+    if (S().calendar.date < next.date) {
+      const reached = await runSim('gameday', next.date);
+      if (!reached || S().calendar.date !== next.date) return;
+    }
+    let res;
+    try { res = Game.startLiveGame(); } catch (e) { toast(e.message, 'bad'); return; }
+    if (!res.ok) { ui.blockers = res.blockers; openModal('blockers', res.blockers); render(); return; }
+    const G = Game.live, g = S().games[G.gameId];
+    ui.live = { gameId: G.gameId, side: G.side, playoff: G.match.playoff, home: g.homeId, away: g.awayId, match: G.match,
+      t: 0, period: 1, paused: false, intermission: null, last: performance.now(),
+      queue: [], shown: [], recs: [], snaps: [], snap0: G.match.snapshot(), pens: 0,
+      endAt: null, so: null, final: false, result: null, sel: null };
+    ui.liveStatsTab = 'mine';
+    if (!ui.liveSpeed) ui.liveSpeed = 60;
+    ui.view = 'live';
+    render();
+    clearInterval(liveTimer);
+    liveTimer = setInterval(liveFrame, 100);
+  }
+
+  // A computed minute → things to show at their second.
+  function queueMinute(rec) {
+    const lv = LV(), m = rec.minute, snap = lv.match.snapshot(), prev = lv.recs[m - 1];
+    lv.recs[m] = rec; lv.snaps[m] = snap;
+    for (let i = 0; i < 2; i++) if (rec.pulled[i] !== (prev ? prev.pulled[i] : false)) lv.queue.push({ sec: m * 60, kind: 'pull', side: i, on: rec.pulled[i] });
+    const n = rec.shots.length;
+    rec.shots.forEach((sh, k) => lv.queue.push({ sec: sh.goal ? sh.goal.sec : m * 60 + Math.round((k + 1) * 60 / (n + 1)), kind: sh.goal ? 'goal' : 'shot', side: sh.side, period: rec.period, goal: sh.goal }));
+    for (const p of snap.penList.slice(lv.pens)) lv.queue.push({ sec: p.sec, kind: 'pen', side: p.side, period: p.period, pen: p });
+    lv.pens = snap.penList.length;
+    if (rec.ended) lv.endAt = rec.shots.filter(x => x.goal).pop().goal.sec;
+    lv.queue.sort((a, b) => a.sec - b.sec);
+  }
+  const revealTo = t => { const lv = LV(); while (lv.queue.length && lv.queue[0].sec <= t) lv.shown.push(lv.queue.shift()); };
+
+  function liveFrame() {
+    const lv = LV();
+    if (!lv || lv.final) { clearInterval(liveTimer); liveTimer = null; return; }
+    if (!Game.live) { clearInterval(liveTimer); liveTimer = null; ui.live = null; return; }   // another game was loaded
+    const now = performance.now(), dt = Math.min(1, (now - lv.last) / 1000);
+    lv.last = now;
+    if (document.hidden && !lv.paused) { lv.paused = true; updateLive(true); return; }   // pause while the tab is hidden
+    if (lv.paused) return;
+    try {
+      if (lv.intermission) {
+        lv.intermission.left -= dt;
+        if (lv.intermission.left <= 0) {
+          lv.intermission = null;
+          if (lv.match.stage === 'SO') { Game.liveStep(); lv.so = { attempts: lv.match.snapshot().shootout.attempts, shown: 0, wait: 0.6 }; }
+          else lv.period++;
+        }
+      } else if (lv.so) {
+        lv.so.wait -= dt;
+        if (lv.so.wait <= 0) {
+          const a = lv.so.attempts[lv.so.shown++];
+          lv.shown.push({ sec: lv.t, kind: 'so', side: a.side, so: a });
+          lv.so.wait = 1.2;
+          if (lv.so.shown >= lv.so.attempts.length) return finishLive();
+        }
+      } else {
+        const end = lv.endAt !== null ? lv.endAt : periodEnd(lv.period), target = Math.min(lv.t + dt * ui.liveSpeed, end);
+        while (!lv.match.done && lv.match.stage !== 'SO' && lv.match.minute * 60 < target && lv.endAt === null) queueMinute(Game.liveStep());
+        lv.t = Math.min(target, lv.endAt !== null ? lv.endAt : Infinity);
+        revealTo(lv.t);
+        if (lv.t >= (lv.endAt !== null ? lv.endAt : periodEnd(lv.period))) {
+          if (lv.match.done) return finishLive();
+          const label = lv.match.stage === 'SO' ? 'End of overtime' : lv.period === 3 ? 'End of regulation' : `End of the ${periodName(lv.period)}`;
+          lv.intermission = { left: INTERMISSION, label, next: lv.match.stage === 'SO' ? 'The shootout' : periodName(lv.period + 1).replace(/^./, c => c.toUpperCase()) };
+          lv.shown.push({ sec: lv.t, kind: 'period', text: label });
+        }
+      }
+    } catch (e) {
+      console.error(e); window.__uiErrors.push(String(e.stack || e));
+      toast(`Live game error: ${e.message}`, 'bad');
+      lv.paused = true;
+    }
+    updateLive();
+  }
+
+  // The rest of the game at once ("Sim to end"), then the final.
+  function liveSimToEnd() {
+    const lv = LV();
+    lv.intermission = null;
+    while (!lv.match.done) { const rec = Game.liveStep(); if (rec) queueMinute(rec); }
+    const box = lv.match.snapshot();
+    lv.t = lv.endAt !== null ? lv.endAt : Math.max(lv.t, lv.match.minute * 60);
+    lv.period = Math.max(lv.period, ...lv.recs.filter(Boolean).map(r => r.period));   // e.g. into overtime
+    revealTo(Infinity);
+    if (box.shootout) {
+      const done = lv.so ? lv.so.shown : 0;
+      for (const a of box.shootout.attempts.slice(done)) lv.shown.push({ sec: lv.t, kind: 'so', side: a.side, so: a });
+    }
+    finishLive();
+  }
+
+  function finishLive() {
+    const lv = LV();
+    if (lv.final) return;
+    lv.final = true; lv.paused = false; lv.intermission = null; lv.so = null;
+    clearInterval(liveTimer); liveTimer = null;
+    try { lv.result = Game.finishLiveGame(); } catch (e) { console.error(e); window.__uiErrors.push(String(e.stack || e)); toast(e.message, 'bad'); }
+    const r = resultFor(S().games[lv.gameId], user());
+    lv.shown.push({ sec: lv.t, kind: 'final', text: `Final: ${r.label} ${r.score}` });
+    render();
+    autosave();
+    if (lv.result && lv.result.interrupts.length) toast(lv.result.interrupts[0].title);
+  }
+
+  // ── what the page shows ──
+  const pClock = t => { const lv = LV(), n = lv.period; return clockText(Math.max(0, periodEnd(n) - Math.max(periodStart(n), t))); };
+  // Goals, shots, penalties so far, from what has been shown.
+  function liveTotals() {
+    const lv = LV(), periods = Math.max(3, lv.period, ...lv.shown.map(e => e.period || 0)), z = () => new Array(periods).fill(0);
+    const T = [0, 1].map(() => ({ goals: z(), shots: z(), ppOpp: 0, ppg: 0, pim: 0 }));
+    for (const e of lv.shown) {
+      if (e.kind === 'shot' || e.kind === 'goal') { T[e.side].shots[e.period - 1]++; if (e.kind === 'goal') { T[e.side].goals[e.period - 1]++; if (e.goal.strength === 'PP') T[e.side].ppg++; } }
+      if (e.kind === 'pen') { T[e.side].pim += e.pen.minutes; T[1 - e.side].ppOpp++; }
+    }
+    return T;
+  }
+  // The stats as of the last finished minute (no spoilers from the minute being played).
+  const liveSnap = () => { const lv = LV(); if (lv.final) return lv.match.snapshot(); const m = Math.floor(lv.t / 60) - 1; for (let k = m; k >= 0; k--) if (lv.snaps[k]) return lv.snaps[k]; return lv.snap0; };
+  const nowRec = () => { const lv = LV(); return lv.recs[Math.min(Math.floor(lv.t / 60), lv.recs.length - 1)] || null; };
+  // The power play running now, from the penalties and power-play goals shown so far.
+  function livePP() {
+    const lv = LV(), t = lv.t, on = [];
+    for (const e of lv.shown) {
+      if (e.kind !== 'pen') continue;
+      let end = e.sec + e.pen.minutes * 60;
+      const ppGoal = lv.shown.find(x => x.kind === 'goal' && x.side !== e.side && x.goal.strength === 'PP' && x.sec > e.sec && x.sec < end);
+      if (ppGoal) end = ppGoal.sec;
+      if (t >= e.sec && t < end) on.push({ side: 1 - e.side, left: end - t });
+    }
+    if (!on.length) return null;
+    const by = [0, 1].map(i => on.filter(x => x.side === i));
+    if (by[0].length && by[1].length) return { text: '4 on 4', left: Math.min(...on.map(x => x.left)) };
+    const x = on.sort((a, b) => a.left - b.left)[0];
+    return { text: `Power play · ${team(sideTeam(x.side)).abbrev}`, left: x.left };
+  }
+
+  function liveBoardHTML() {
+    const lv = LV(), T = liveTotals(), rec = nowRec(), pp = livePP();
+    const g = S().games[lv.gameId], final = lv.final && g.played;
+    const score = i => (final ? (i === 0 ? g.result.home : g.result.away) : U.sum(T[i].goals));
+    const teamBlock = i => `<div class="lteam${i === lv.side ? ' mine' : ''}">${chip(sideTeam(i), { big: true })}
+      <div class="lname"><b>${esc(team(sideTeam(i)).city)}</b><span class="muted small">${esc(team(sideTeam(i)).name)} · SOG ${U.sum(T[i].shots)}</span>
+      ${!lv.final && rec && rec.pulled[i] ? '<span class="badge bad">Empty net</span>' : ''}</div><div class="lscore">${score(i)}</div></div>`;
+    let status;
+    if (final) status = `<span class="badge">FINAL${g.result.decidedIn === 'REG' ? '' : `/${g.result.decidedIn}`}</span>`;
+    else if (lv.paused) status = '<span class="badge warn">PAUSED</span>';
+    else if (lv.intermission) status = `<span class="badge acc">${esc(lv.intermission.label)}</span>`;
+    else if (lv.so) status = '<span class="badge acc">SHOOTOUT</span>';
+    else status = '<span class="badge good">LIVE</span>';
+    const clock = final ? (g.result.decidedIn === 'SO' ? 'Shootout' : esc(pLabel(lv.period))) : lv.so ? 'Shootout'
+      : lv.intermission ? `${esc(lv.intermission.next)} in ${Math.ceil(Math.max(0, lv.intermission.left))}s` : `${esc(pLabel(lv.period))} · <b>${pClock(lv.t)}</b>`;
+    return `<div class="lboard">${teamBlock(1)}<div class="lmid"><div class="lclock">${clock}</div>${status}
+      ${!lv.final && pp && !lv.intermission ? `<div class="small">${esc(pp.text)} <b>${clockText(pp.left)}</b></div>` : ''}</div>${teamBlock(0)}</div>`;
+  }
+
+  function liveControlsHTML() {
+    const lv = LV();
+    if (lv.final) {
+      return `<div class="toolbar" style="margin:0"><b>${esc(lv.shown[lv.shown.length - 1].text)}</b><span class="spacer"></span>
+        <button class="btn" data-act="box" data-id="${lv.gameId}">Box score</button><button class="btn primary" data-act="live-done">Done</button></div>`;
+    }
+    return `<div class="toolbar" style="margin:0">
+      <button class="btn primary" data-act="live-pause">${lv.paused ? '▶ Resume' : '❚❚ Pause'}</button>
+      <span class="muted small">Speed</span>${segAct('live-speed', LIVE_SPEEDS, ui.liveSpeed)}
+      <span class="spacer"></span><button class="btn" data-act="live-end">Sim to end</button></div>
+      <p class="muted small" style="margin:6px 0 0">Pause any time (space bar) to change lines or pull the goalie. Changes count from the next minute.</p>`;
+  }
+
+  // Your bench: lines to rearrange (tap two players), goalies, and coaching calls.
+  function liveBenchHTML() {
+    const lv = LV(), me = user(), lu = team(me).lineup, snap = liveSnap(), x = id => snap.skaters[id] || {};
+    const rec = !lv.final && !lv.intermission && nowRec(), on = new Set(rec ? rec.onIce[lv.side] : []);
+    const slot = (key, id, slotName) => {
+      const p = P(id), f = Lineup.fit(p, slotName), s = x(id);
+      return `<button class="slot${lv.sel === key ? ' sel' : ''}${f < 1 ? ' off' : ''}${on.has(id) ? ' onice' : ''}" data-act="live-slot" data-key="${key}" data-pid="${id}"${lv.final ? ' disabled' : ''}>
+        <span class="pos">${slotName}</span><span class="nm">${esc(p.lastName)}</span>${ovr(p.ovr)}
+        <span class="sub">${s.g || 0}G ${s.a || 0}A · ${s.sog || 0} SOG · ${clockText(s.toi || 0)}${f < 1 ? ` · <b>${p.position} at ${slotName}</b>` : ''}</span></button>`;
+    };
+    const fwd = lu.F.map((l, i) => `<div class="line"><span class="lbl">L${i + 1}</span>${l.map((id, k) => slot(`F:${i}:${k}`, id, Lineup.SLOTS[k])).join('')}</div>`).join('');
+    const def = lu.D.map((pr, i) => `<div class="line" style="--n:2"><span class="lbl">P${i + 1}</span>${pr.map((id, k) => slot(`D:${i}:${k}`, id, 'D')).join('')}</div>`).join('');
+    const sideNow = lv.match.sides[lv.side], gl = id => snap.goalies.find(g => g.id === id);
+    const gRow = (id, label) => { if (!id) return ''; const s = gl(id), sv = s && s.sa ? ((s.sa - s.ga) / s.sa).toFixed(3).replace(/^0/, '') : '—';
+      return `<div class="gl"><span class="badge${label === 'In net' ? ' good' : ''}">${label}</span> ${plink(P(id))} ${ovr(P(id).ovr)} <span class="muted small">${s ? `${s.sa - s.ga} save${s.sa - s.ga === 1 ? '' : 's'} on ${s.sa} · ${sv}` : 'hasn\'t played'}</span></div>`; };
+    const coach = lv.match.snapshot().coach[lv.side];
+    const calls = lv.final ? '' : `<div class="stack" style="gap:8px;margin-top:10px">
+        <div class="toolbar" style="margin:0"><span class="small muted" style="min-width:76px">Goalie</span>${segAct('live-pull', [['auto', 'Auto'], ['pull', 'Pull for extra attacker'], ['in', 'Keep in net']], coach.pull)}
+          <button class="btn small" data-act="live-goalie"${sideNow.backupId ? '' : ' disabled'}>Switch goalie</button></div>
+        <div class="toolbar" style="margin:0"><span class="small muted" style="min-width:76px">Line usage</span>${segAct('live-usage', [['balanced', 'Balanced'], ['top', 'Lean on top lines'], ['roll', 'Roll four lines']], coach.usage)}</div></div>`;
+    return `<h2>Your bench<span class="right muted">${lv.final ? 'final' : 'tap two players to swap them'}</span></h2>
+      <div class="lines">${fwd}</div><div class="lines" style="margin-top:8px">${def}</div>
+      <div class="stack" style="gap:4px;margin-top:10px">${gRow(sideNow.goalie.id, 'In net')}${gRow(sideNow.backupId, 'Backup')}</div>${calls}`;
+  }
+  // Highlight who's on the ice this minute without rebuilding the bench (a rebuild could swallow a tap).
+  function markOnIce() {
+    const lv = LV(), rec = !lv.final && !lv.intermission && nowRec(), on = new Set(rec ? rec.onIce[lv.side] : []);
+    document.querySelectorAll('#liveBench [data-pid]').forEach(el => el.classList.toggle('onice', on.has(el.dataset.pid)));
+  }
+
+  function liveStatsHTML() {
+    const lv = LV(), T = liveTotals(), snap = liveSnap(), n = T[0].goals.length;
+    const fo = i => { let w = 0, l = 0; for (const s of Object.values(snap.skaters)) if (s.side === i) { w += s.fow; l += s.fol; } return w + l ? `${Math.round(100 * w / (w + l))}%` : '—'; };
+    const hd = [...Array(n).keys()].map(k => `<th class="num">${pLabel(k + 1)}</th>`).join('');
+    const row = i => `<tr${i === lv.side ? ' class="me"' : ''}><td>${chip(sideTeam(i))}</td>${T[i].goals.map(x => `<td class="num">${x}</td>`).join('')}<td class="num"><b>${U.sum(T[i].goals)}</b></td>
+      <td class="num">${U.sum(T[i].shots)}</td><td class="num">${T[i].ppg}/${T[i].ppOpp}</td><td class="num">${T[i].pim}</td><td class="num">${fo(i)}</td></tr>`;
+    const goals = lv.shown.filter(e => e.kind === 'goal');
+    const gLine = e => { const g = e.goal, as = [g.a1, g.a2].filter(Boolean).map(id => P(id).lastName);
+      return `<tr><td class="muted small nowrap">${pLabel(e.period)} ${clockText(g.sec - periodStart(e.period))}</td><td>${chip(sideTeam(e.side))} ${plink(P(g.scorer))}${as.length ? ` <span class="muted small">(${esc(as.join(', '))})</span>` : ''}${g.strength !== 'EV' ? ` <span class="badge">${g.strength}</span>` : ''}</td></tr>`; };
+    return `<h2>Game stats</h2><div class="scroll"><table class="t"><thead><tr><th></th>${hd}<th class="num">G</th><th class="num">SOG</th><th class="num">PP</th><th class="num">PIM</th><th class="num">FO</th></tr></thead>
+      <tbody>${row(1)}${row(0)}</tbody></table></div>
+      <div class="section-title" style="margin-top:12px">Scoring</div>${goals.length ? `<table class="t"><tbody>${goals.map(gLine).join('')}</tbody></table>` : '<p class="muted small" style="margin:0">No goals yet.</p>'}`;
+  }
+
+  function liveFeedHTML() {
+    const lv = LV(), ab = i => team(sideTeam(i)).abbrev;
+    const text = e => {
+      if (e.kind === 'goal') { const g = e.goal; return `<b>GOAL ${esc(ab(e.side))}</b> ${esc(Select.fullName(P(g.scorer)))}${g.strength !== 'EV' ? ` (${g.strength})` : ''}`; }
+      if (e.kind === 'pen') return `${esc(ab(e.side))} penalty: ${esc(Select.fullName(P(e.pen.playerId)))}, ${e.pen.minutes} min`;
+      if (e.kind === 'pull') return e.on ? `${esc(ab(e.side))} pull the goalie for an extra attacker` : `${esc(ab(e.side))} goalie back in net`;
+      if (e.kind === 'so') return `Shootout: ${esc(ab(e.side))} ${esc(Select.fullName(P(e.so.playerId)))} ${e.so.scored ? '<b>scores</b>' : 'is stopped'}`;
+      return `<b>${esc(e.text)}</b>`;
+    };
+    const items = lv.shown.filter(e => e.kind !== 'shot').slice(-40).reverse();
+    return `<h2>Play-by-play</h2>${items.length ? items.map(e => `<div class="msg read"><span></span><span class="t">${text(e)}</span>
+      <span class="muted small nowrap">${e.kind === 'period' || e.kind === 'final' || e.kind === 'so' ? '' : `${pLabel(e.period || 1)} ${clockText(e.sec - periodStart(e.period || 1))}`}</span></div>`).join('') : '<p class="muted small" style="margin:0">The puck is about to drop.</p>'}`;
+  }
+
+  function livePlayersHTML() {
+    const lv = LV(), snap = liveSnap(), side = (ui.liveStatsTab || 'mine') === 'mine' ? lv.side : 1 - lv.side;
+    const sk = Object.entries(snap.skaters).filter(([, x]) => x.side === side).map(([id, x]) => ({ p: P(id), ...x }))
+      .sort((a, b) => (b.g + b.a) - (a.g + a.a) || b.toi - a.toi);
+    const gs = snap.goalies.filter(g => g.side === side);
+    return `<h2>Players<span class="right">${seg('liveStatsTab', [['mine', team(sideTeam(lv.side)).abbrev], ['opp', team(sideTeam(1 - lv.side)).abbrev]], ui.liveStatsTab || 'mine')}</span></h2>
+      <div class="scroll"><table class="t"><thead><tr><th>Skater</th><th class="num">G</th><th class="num">A</th><th class="num">+/-</th><th class="num">SOG</th><th class="num">PIM</th><th class="num">TOI</th><th class="num hide-sm">FO</th></tr></thead><tbody>
+      ${sk.map(x => `<tr><td><span class="pos">${x.p.position}</span> ${plink(x.p, x.p.lastName)}</td><td class="num">${x.g}</td><td class="num">${x.a}</td><td class="num">${x.pm > 0 ? '+' : ''}${x.pm}</td><td class="num">${x.sog}</td><td class="num">${x.pim}</td><td class="num">${clockText(x.toi)}</td><td class="num hide-sm">${x.fow + x.fol ? `${x.fow}-${x.fol}` : ''}</td></tr>`).join('')}
+      </tbody></table></div>
+      <table class="t" style="margin-top:8px"><thead><tr><th>Goalie</th><th class="num">SA</th><th class="num">GA</th><th class="num">SV%</th><th class="num">TOI</th></tr></thead><tbody>
+      ${gs.map(g => `<tr><td>${plink(P(g.id), P(g.id).lastName)}${g.decision ? ` <span class="badge">${g.decision}</span>` : ''}</td><td class="num">${g.sa}</td><td class="num">${g.ga}</td><td class="num">${g.sa ? ((g.sa - g.ga) / g.sa).toFixed(3).replace(/^0/, '') : '—'}</td><td class="num">${clockText(g.toi)}</td></tr>`).join('')}</tbody></table>`;
+  }
+
+  function liveHTML() {
+    if (!LV()) { ui.view = 'dashboard'; return dashboardHTML(); }
+    return `<div class="live">
+      <div class="card" id="liveBoard">${liveBoardHTML()}</div>
+      <div class="card" id="liveControls">${liveControlsHTML()}</div>
+      <div class="live-grid">
+        <div class="card" id="liveBench">${liveBenchHTML()}</div>
+        <div class="card" id="liveFeed">${liveFeedHTML()}</div>
+        <div class="card" id="liveStats">${liveStatsHTML()}</div>
+        <div class="card" id="livePlayers">${livePlayersHTML()}</div>
+      </div></div>`;
+  }
+  const setHTML = (id, html) => { const el = document.getElementById(id); if (el && el.__html !== html) { el.innerHTML = html; el.__html = html; } };
+  // Each frame: the scoreboard; the rest only when it changed (unchanged parts are left alone, so taps register).
+  function updateLive(controls = false) {
+    if (!LV() || ui.view !== 'live' || !document.getElementById('liveBoard')) return;
+    setHTML('liveBoard', liveBoardHTML());
+    if (controls) setHTML('liveControls', liveControlsHTML());
+    setHTML('liveFeed', liveFeedHTML());
+    setHTML('liveStats', liveStatsHTML());
+    setHTML('livePlayers', livePlayersHTML());
+    const minute = Math.floor(LV().t / 60);
+    if (LV().benchMinute !== minute) { LV().benchMinute = minute; setHTML('liveBench', liveBenchHTML()); }
+    markOnIce();
+  }
+  const refreshLive = () => { if (ui.view === 'live') { render(); markOnIce(); } };
+
+  // Tap one player, then another: they swap places (only players dressed for this game).
+  function onLiveSlot(key) {
+    const lv = LV();
+    if (lv.final) return;
+    if (!lv.sel || lv.sel === key) { lv.sel = lv.sel === key ? null : key; return refreshLive(); }
+    const a = lv.sel, b = key, cur = team(user()).lineup;
+    lv.sel = null;
+    const lu = JSON.parse(JSON.stringify({ F: cur.F, D: cur.D }));
+    const get = k => { const [kind, x, y] = k.split(':'); return kind === 'F' ? lu.F[x][y] : lu.D[x][y]; };
+    const set = (k, v) => { const [kind, x, y] = k.split(':'); if (kind === 'F') lu.F[x][y] = v; else lu.D[x][y] = v; };
+    const va = get(a), vb = get(b);
+    set(a, vb); set(b, va);
+    const res = Game.liveSetLines(lu);
+    if (!res.ok) toast(res.problems[0], 'bad'); else toast(`${P(va).lastName} and ${P(vb).lastName} swapped.`);
+    refreshLive();
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
   // Render
   // ════════════════════════════════════════════════════════════════════════
   const VIEWS = { dashboard: dashboardHTML, roster: rosterHTML, lines: linesHTML, schedule: scheduleHTML, standings: standingsHTML, leaders: leadersHTML,
-                  playoffs: playoffsHTML, draft: draftHTML, contracts: contractsHTML, market: marketHTML, trade: tradeHTML, news: newsHTML, history: historyHTML, inbox: inboxHTML };
+                  playoffs: playoffsHTML, draft: draftHTML, contracts: contractsHTML, market: marketHTML, trade: tradeHTML, news: newsHTML, history: historyHTML, inbox: inboxHTML,
+                  live: liveHTML };
   function render() {
     const app = document.getElementById('app');
     if (!S()) { app.innerHTML = welcomeHTML(); return; }
     document.documentElement.style.setProperty('--team', team(user()).colors.primary);
+    if (Game.live && ui.live) ui.view = 'live';               // a live game holds the screen until it's over
     try {
       app.innerHTML = headerHTML() + tabsHTML() + `<main>${VIEWS[ui.view]()}</main>`;
     } catch (e) {
@@ -6719,18 +7217,20 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
   // Simulation (yields to the browser every few days so the page stays responsive)
   // ════════════════════════════════════════════════════════════════════════
   const nextFrame = () => new Promise(r => setTimeout(r, 0));
-  async function runSim(kind) {
-    if (ui.busy || !S()) return;
+  // Returns true when the sim reached its goal (false if news, a blocker or an error stopped it first).
+  async function runSim(kind, untilDate = null) {
+    if (ui.busy || !S()) return false;
     const s = S(), startPhase = s.calendar.phase;
-    if (kind === 'next' && !Calendar.teamGames(s, user()).some(g => !g.played)) { toast('No game is scheduled for your team.'); return; }
+    if (kind === 'next' && !Calendar.teamGames(s, user()).some(g => !g.played)) { toast('No game is scheduled for your team.'); return false; }
     ui.busy = true; ui.blockers = null; ui.progress = fmtShort(s.calendar.date); render();
-    let days = 0, stopped = null, needs = null, lastUserGame = null;
+    let days = 0, stopped = null, needs = null, lastUserGame = null, reached = false;
     const done = {
       day: () => true,
       next: res => res.played.some(id => userGame(s.games[id])),
       week: () => days >= 7,
       month: () => days >= 30,
       phase: () => s.calendar.phase !== startPhase,
+      gameday: () => s.calendar.date >= untilDate,          // the day of your next game, before it's played (live)
     }[kind];
     try {
       for (let guard = 0; guard < 400; guard++) {
@@ -6739,7 +7239,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
         days++;
         const ug = res.played.map(id => s.games[id]).find(userGame);
         if (ug) lastUserGame = ug;
-        if (done(res)) break;
+        if (done(res)) { reached = true; break; }
         if (kind !== 'phase' && res.interrupts.length) { toast(res.interrupts[0].title); break; }   // "sim to …" runs straight through
         if (days % 4 === 0) { ui.progress = fmtShort(s.calendar.date); renderBusy(); await nextFrame(); }
       }
@@ -6756,6 +7256,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
     } else if (days > 1) toast(`Simulated ${days} days.`);
     render();
     if (days) autosave();
+    return reached;
   }
   // Light re-render of the header only while a sim runs.
   function renderBusy() { const h = document.querySelector('.topbar'); if (h) h.outerHTML = headerHTML(); }
@@ -6790,7 +7291,16 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
   const ACTIONS = {
     view: d => { ui.view = d.view; ui.lineSel = null; closeModal(); render(); window.scrollTo(0, 0); },
     set: d => { ui[d.key] = d.val; render(); },
-    sim: d => runSim(d.kind),
+    sim: d => (d.kind === 'live' ? startLive() : runSim(d.kind)),
+    // Live games
+    'live-pause': () => { const lv = LV(); if (!lv || lv.final) return; lv.paused = !lv.paused; lv.last = performance.now(); updateLive(true); },
+    'live-speed': d => { ui.liveSpeed = Number(d.val); updateLive(true); },
+    'live-end': () => { if (LV() && !LV().final) liveSimToEnd(); },
+    'live-done': () => { ui.live = null; ui.view = 'dashboard'; render(); },
+    'live-slot': d => onLiveSlot(d.key),
+    'live-pull': d => { Game.livePullGoalie(d.val); toast(d.val === 'pull' ? 'Goalie pulled: an extra attacker from the next minute.' : d.val === 'in' ? 'Your goalie stays in net.' : 'Your goalie comes out when you trail late (auto).'); refreshLive(); },
+    'live-usage': d => { Game.liveLineUsage(d.val); toast(d.val === 'top' ? 'Leaning on your top lines.' : d.val === 'roll' ? 'Rolling all four lines.' : 'Balanced line usage.'); refreshLive(); },
+    'live-goalie': () => { const id = Game.liveSwitchGoalie(); toast(`${Select.fullName(P(id))} is in net.`); refreshLive(); },
     box: d => openModal('box', d.id),
     player: d => openModal('player', d.id),
     series: d => openModal('series', d.id),
@@ -6928,6 +7438,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && ui.modal) { closeModal(); return; }
     if (ui.modal || !S() || e.metaKey || e.ctrlKey || e.altKey || /input|select|textarea/i.test(e.target.tagName)) return;
+    if (ui.live && !ui.live.final && ui.view === 'live') { if (e.key === ' ') { e.preventDefault(); ACTIONS['live-pause'](); } return; }
+    if (Game.live) return;
     const k = { d: 'day', n: 'next', w: 'week' }[e.key.toLowerCase()];
     if (k) runSim(k);
   });

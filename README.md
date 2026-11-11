@@ -1,6 +1,6 @@
 # Hockey Franchise Manager
 
-**▶ Play the latest version (0.1.1): https://tenuredparrot.github.io/hockey-franchise-manager/**
+**▶ Play the latest version (0.2.0): https://tenuredparrot.github.io/hockey-franchise-manager/**
 
 A hockey general-manager sim that runs in the browser on a computer, tablet or phone, with nothing to install. This
 is a test build of a game that's still being made, updated now and then. The version you're playing is in the
@@ -10,14 +10,58 @@ browser tab's title and in [`version.json`](version.json).
 
 | Version | Released | What it is |
 |---|---|---|
-| [**0.1.1**](https://github.com/TenuredParrot/hockey-franchise-manager/releases/tag/v0.1.1) (current) | 2026-11-11 | Fixes for the trade system. "What would it take?" now finds deals for stars, offers from other teams can be accepted on a phone, and the trade screen no longer shows out-of-date players. Saves from 0.1.0 carry on as they are. |
+| [**0.2.0**](https://github.com/TenuredParrot/hockey-franchise-manager/releases/tag/v0.2.0) (current) | 2026-11-11 | Live games. You can now play any of your games live instead of simming it: watch it on a running clock with the score, stats and play-by-play, and pause any time to change your lines, pull your goalie, switch goalies or change how much your top lines play. Simming is unchanged, and saves from 0.1.x carry on as they are. |
+| [**0.1.1**](https://github.com/TenuredParrot/hockey-franchise-manager/releases/tag/v0.1.1) | 2026-11-11 | Fixes for the trade system. "What would it take?" now finds deals for stars, offers from other teams can be accepted on a phone, and the trade screen no longer shows out-of-date players. Saves from 0.1.0 carry on as they are. |
 | [**0.1.0**](https://github.com/TenuredParrot/hockey-franchise-manager/releases/tag/v0.1.0) | 2026-11-11 | The first public test build: the complete game through development phase 6. You run an NHL-style franchise through full seasons and offseasons, against AI general managers who trade, draft and sign players on their own. |
 
 Each version has a page on [**Releases**](https://github.com/TenuredParrot/hockey-franchise-manager/releases) with its full notes and a download of that version: the
 whole game as one HTML file. Open it in a browser to play that version offline. Downloaded copies keep their saves
 apart from the website's. [CHANGELOG.md](CHANGELOG.md) has every version's notes in one place.
 
-## What's new in 0.1.1
+## What's new in 0.2.0
+
+Live games. You can now play any of your games live instead of simming it: watch it on a running clock with the
+score, stats and play-by-play, and pause any time to change your lines, pull your goalie, switch goalies or change
+how much your top lines play. Simming is unchanged, and saves from 0.1.x carry on as they are.
+
+**Playing a game live**
+- **Two buttons:** "Play it live" (on the dashboard's Next game card, or "Play next game live" in the top bar) plays
+  your next game live; "Sim it" / "Sim next game" sims it instantly as before. You choose game by game, playoffs
+  included.
+- **The clock:** the game runs at 1 game minute per second by default. The speed buttons switch between 30 seconds,
+  1 minute, 2 minutes and 3 minutes of game time per second.
+- **Intermissions:** each period ends with a 5-second intermission before the next one starts, and the same comes
+  before overtime and the shootout. Overtime and shootouts play out live too: 3-on-3 sudden death in the regular
+  season, full 20-minute sudden-death periods in the playoffs.
+- **Pause and Sim to end:** pause any time with the button or the space bar. "Sim to end" finishes the game
+  instantly.
+
+**What you see**
+- A scoreboard with the period, the clock, shots on goal, power plays (with the time left) and empty nets.
+- Game stats: goals by period, shots, power play, penalty minutes and faceoffs, plus the scoring summary.
+- A play-by-play of goals, penalties, goalie pulls, period ends and every shootout attempt.
+- Player stats for both teams (goals, assists, +/-, shots, penalty minutes, ice time, faceoffs) and both teams'
+  goalies.
+- Your bench: your lines and defence pairs, each player's game so far, and who's on the ice right now.
+
+**Coaching during the game**
+- **Change your lines:** tap two players to swap them, only among the players dressed for the game. The new lines
+  stay for later games, as with the Lines page.
+- **Pull your goalie** for an extra attacker, keep him in net no matter what, or leave it on Auto, which pulls when
+  you're trailing late, as AI coaches do.
+- **Switch goalies:** put your backup in. The win or loss goes to the goalie who played more, and the reliever is
+  credited with a game but not a start.
+- **Line usage:** balanced, lean on your top lines, or roll all four lines.
+- Changes count from the next minute of play.
+
+**Notes**
+- A live game isn't saved while it's in progress. The game autosaves when it ends; reloading the page mid-game leaves
+  that game unplayed, ready to play again.
+- Watching a game live doesn't change anything else in the season.
+
+## Earlier versions
+
+<details><summary><b>0.1.1</b> (2026-11-11): Fixes for the trade system. "What would it take?" now finds deals for stars, offers from other teams can be accepted on a phone, and the trade screen no longer shows out-of-date players. Saves from 0.1.0 carry on as they are.</summary>
 
 Fixes for the trade system. "What would it take?" now finds deals for stars, offers from other teams can be
 accepted on a phone, and the trade screen no longer shows out-of-date players. Saves from 0.1.0 carry on as they
@@ -43,7 +87,7 @@ are.
 
 AI teams trade with each other exactly as in 0.1.0.
 
-## Earlier versions
+</details>
 
 <details><summary><b>0.1.0</b> (2026-11-11): The first public test build: the complete game through development phase 6. You run an NHL-style franchise through full seasons and offseasons, against AI general managers who trade, draft and sign players on their own.</summary>
 
