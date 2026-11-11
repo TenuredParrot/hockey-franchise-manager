@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Hockey Franchise Manager 0.1.0: run an NHL-style franchise. A 32-team league, trades, the draft and free agency. Test build.">
+<meta name="description" content="Hockey Franchise Manager 0.1.1: run an NHL-style franchise. A 32-team league, trades, the draft and free agency. Test build.">
 <meta name="theme-color" content="#121821">
-<meta name="hfm-build" content="0.1.0 · built 2026-11-11 15:28 MST · d8c0a4fa03 · save format v6">
+<meta name="hfm-build" content="0.1.1 · built 2026-11-11 15:57 MST · e975ae8068 · save format v6">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%231d4f9a'/><circle cx='32' cy='32' r='21' fill='none' stroke='%23c8102e' stroke-width='4'/><ellipse cx='32' cy='36' rx='14' ry='5.5' fill='%23111316'/><rect x='18' y='30' width='28' height='6' fill='%23111316'/><ellipse cx='32' cy='30' rx='14' ry='5.5' fill='%233b4049'/></svg>">
-<title>Hockey Franchise Manager 0.1.0</title>
+<title>Hockey Franchise Manager 0.1.1</title>
 <script>
   // Collected for the headless UI smoke test (tests/browser/ui_smoke.js).
   window.__uiErrors = [];
@@ -185,6 +185,9 @@
   /* ── trades ── */
   .trade-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); align-items: start; margin-top: 14px; }
   .trade-sides { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
+  .offer { padding: 12px 0; border-top: 1px solid var(--line); }
+  .offer:first-of-type { border-top: 0; padding-top: 0; }
+  .offer-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; }
   .tlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
   .tlist li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .tlist select { padding: 1px 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
@@ -4634,7 +4637,7 @@ const Trade = (() => {
   // `giver` adds assets until `recv` accepts: the cheapest single asset that does it (by the giver's own values),
   // or a greedy package of the assets the receiver values most relative to the giver, whichever costs the giver
   // less. The giver never lets its own gain go negative (unless `free`: you decide for yourself).
-  function sweeten(s, deal, giver, ctx, mult, { maxAssets, free = false, avoidRecent = true }) {
+  function sweeten(s, deal, giver, ctx, mult, { maxAssets, free = false, avoidRecent = true, strict = true }) {
     const recv = other(deal, giver), room = maxAssets - count(deal.give[giver]);
     if (room <= 0) return null;
     const g0 = values(s, ctx[giver], deal), r0 = values(s, ctx[recv], deal);
@@ -4649,26 +4652,59 @@ const Trade = (() => {
       return { r: r.accept, g: free || judge(g0.vin, gOut, mult[giver]).accept, gDelta: free ? 1 : g0.vin - gOut, cost: gOut - g0.vout };
     };
     const friction = c => (ai && c.a.type === 'player' ? T.ai.playerFriction : 0);
+    // When you ask "what would it take?" (free), a package must keep the deal within the rules negotiate() can't
+    // repair later — the contract limit, your goalies. Strict: their cap too (only your own may end up over, fixed
+    // next by sending salary back). Not strict: either cap may, the over side sending contracts back. (For AI teams
+    // this always passes, so their bargaining is unchanged.)
+    const fixable = strict ? new RegExp(`^${s.teams[giver].abbrev} would be .* over the cap$`) : / over the cap$/;
+    const fits = pkg => {
+      if (!free) return true;
+      const d = clone(deal);
+      for (const c of pkg) addAsset(d, giver, c.a);
+      return legality(s, d).every(p => fixable.test(p));
+    };
     let single = null;
     for (const c of cands) {
       const t = ok([...r0.ins, c.vr], [...g0.outs, c.vg]), cost = t.cost + friction(c);
-      if (t.r && t.g && (!single || cost < single.cost)) single = { add: [c.a], cost };
+      if (t.r && t.g && (!single || cost < single.cost) && fits([c])) single = { add: [c.a], cost };
     }
     let greedy = null;
     const left = cands.slice().sort((a, b) => b.vr / Math.max(b.vg + friction(b), 1) - a.vr / Math.max(a.vg + friction(a), 1));
-    const rIns = [...r0.ins], gOuts = [...g0.outs], add = [];
+    const rIns = [...r0.ins], gOuts = [...g0.outs], add = [], addC = [];
     for (const c of left) {
       if (add.length >= room) break;
       const t = ok([...rIns, c.vr], [...gOuts, c.vg]);
-      if (t.gDelta < 0) continue;
-      rIns.push(c.vr); gOuts.push(c.vg); add.push(c.a);
+      if (t.gDelta < 0 || !fits([...addC, c])) continue;
+      rIns.push(c.vr); gOuts.push(c.vg); add.push(c.a); addC.push(c);
       if (t.r && t.g) { greedy = { add: add.slice(), cost: t.cost + U.sum(add.map(a => (ai && a.type === 'player' ? T.ai.playerFriction : 0))), done: true }; break; }
     }
+    // For you, one more way: offer what they value most (a star is worth more than any single asset or any pile of
+    // cheap ones, since packages are valued quality-first), then drop whatever they'd accept without, costliest to
+    // you first. The cheapest of the packages that close the deal wins.
+    let top = null;
+    if (free) {
+      const accepts = pkg => judge(packageValue([...r0.ins, ...pkg.map(c => c.vr)]), r0.vout, mult[recv]).accept;
+      const pkg = [];
+      for (const c of cands.slice().sort((a, b) => b.vr - a.vr)) {
+        if (pkg.length >= room) break;
+        if (!fits([...pkg, c])) continue;
+        pkg.push(c);
+        if (accepts(pkg)) break;
+      }
+      if (pkg.length && accepts(pkg)) {
+        for (const c of pkg.slice().sort((a, b) => b.vg - a.vg)) {
+          const rest = pkg.filter(x => x !== c);
+          if (rest.length && accepts(rest)) pkg.splice(pkg.indexOf(c), 1);
+        }
+        top = { add: pkg.map(c => c.a), cost: packageValue([...g0.outs, ...pkg.map(c => c.vg)]) - g0.vout, done: true };
+      }
+    }
+    const closing = [single, greedy && greedy.done ? greedy : null, top].filter(Boolean).sort((a, b) => a.cost - b.cost);
+    if (closing.length) return closing[0].add;
     // No package closes it yet: take the best-ratio asset as progress, if it covers a real part of the shortfall.
     const short = r0.vout + Math.max(T.margin.min, T.margin.pct * r0.vout) * mult[recv] - r0.vin;
-    if (!greedy && add.length && cands.find(c => c.a === add[0]).vr >= T.ai.minProgress * short) greedy = { add: add.slice(0, 1), cost: Infinity, done: false };
-    const pick = single && (!greedy || !greedy.done || single.cost <= greedy.cost) ? single : greedy;
-    return pick ? pick.add : null;
+    if (add.length && cands.find(c => c.a === add[0]).vr >= T.ai.minProgress * short) return add.slice(0, 1);
+    return null;
   }
 
   // The team over the cap gets relief: its partner keeps up to half of the salary it sends (AI partners only),
@@ -4705,7 +4741,7 @@ const Trade = (() => {
   // A wants `target` from B: balance the values (whichever side is unhappy gets more), then make it cap-legal.
   // Returns a legal deal both sides accept, or null. Options: `deal` to start from, `freeA` (A's acceptance is
   // its own business: the user asking "what would it take?"), `lockB` (B never adds value).
-  function negotiate(s, A, B, target, { deal: start = null, freeA = false, lockB = false, maxAssets = T.ai.maxAssets } = {}) {
+  function negotiate(s, A, B, target, { deal: start = null, freeA = false, lockB = false, maxAssets = T.ai.maxAssets, strict = true } = {}) {
     const deal = start ? clone(start) : makeDeal(A, B);
     if (target && !has(deal, target)) addAsset(deal, B, target);
     const ctx = { [A]: context(s, A), [B]: context(s, B) };
@@ -4721,7 +4757,7 @@ const Trade = (() => {
       }
       const giver = okB ? B : A;
       if (giver === B && lockB) return null;
-      const add = sweeten(s, deal, giver, ctx, mult, { maxAssets, free: giver === A && freeA });
+      const add = sweeten(s, deal, giver, ctx, mult, { maxAssets, free: giver === A && freeA, strict });
       if (!add) return null;
       for (const a of add) addAsset(deal, giver, a);
     }
@@ -4833,11 +4869,12 @@ const Trade = (() => {
     if (!ev.accept) return { accepted: false, reason: reply(ev), interest: ev.interest };
     return { accepted: true, record: execute(s, deal, date, events, { via: 'USER', rng }), interest: ev.interest };
   }
-  // "What would it take?": add your assets (the ones they value most relative to you) until they'd accept.
+  // "What would it take?": add your assets until they'd accept. First within both teams' caps; failing that, letting
+  // salary flow and balancing it by sending contracts back (the only way to afford some stars).
   function suggest(s, deal) {
     deal = normalize(deal);
-    const ai = partnerOf(s, deal), user = s.meta.userTeamId;
-    return negotiate(s, user, ai, null, { deal, freeA: true, lockB: true, maxAssets: T.maxAssets });
+    const ai = partnerOf(s, deal), user = s.meta.userTeamId, opts = { deal, freeA: true, lockB: true, maxAssets: T.maxAssets };
+    return negotiate(s, user, ai, null, { ...opts, strict: true }) || negotiate(s, user, ai, null, { ...opts, strict: false });
   }
   // The most AI team A would give you for `target`: it adds what your staff value most relative to its own cost
   // while it still wants the deal, stopping once your staff would call it fair. Null if A doesn't want him.
@@ -6182,8 +6219,16 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
     if (!ui.tradePartner || !team(ui.tradePartner) || ui.tradePartner === user()) ui.tradePartner = Select.nhlTeams(s).filter(t => t.id !== user()).sort((a, b) => a.city.localeCompare(b.city))[0].id;
     return ui.tradePartner;
   };
+  // The trade screen belongs to one league: when another game is started, loaded or imported (player and pick ids
+  // repeat between leagues), it starts afresh instead of showing leftovers that now point at strangers.
+  function syncTrade() {
+    const s = S();
+    if (ui.tradeState === s) return;
+    Object.assign(ui, { tradeState: s, trade: emptyTrade(), shop: null, tradePartner: null, tradeTabMine: 'NHL', tradeTabTheirs: 'NHL' });
+  }
   // Drop anything that has moved since it was picked (a trade, a release, a used pick).
   function cleanTrade() {
+    syncTrade();
     const s = S(), them = partnerId(), t = ui.trade;
     const keep = (org, g) => {
       g.players = g.players.filter(id => s.players[id] && s.players[id].teamId === org);
@@ -6229,10 +6274,12 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
 
     // Offers to you
     const offers = s.pending.tradeOffers;
-    const offersCard = offers.length ? `<div class="card"><h2>Offers to you<span class="right muted">${offers.length}</span></h2><div class="scroll"><table class="t"><thead><tr><th>From</th><th>They give</th><th>You give</th><th>Expires</th><th></th></tr></thead><tbody>
-      ${offers.map(o => `<tr><td class="nowrap">${chip(o.fromTeamId)} ${stratBadge(o.fromTeamId)}</td><td>${sideHTML(o.deal, o.fromTeamId)}</td><td>${sideHTML(o.deal, me)}</td><td class="muted small nowrap">${esc(fmtShort(o.expires))}</td>
-        <td class="num nowrap"><button class="btn small primary" data-act="trade-accept" data-id="${o.id}"${st.open ? '' : ' disabled'}>Accept</button> <button class="btn small" data-act="trade-edit" data-id="${o.id}">Edit</button> <button class="btn small danger" data-act="trade-decline" data-id="${o.id}">Decline</button></td></tr>`).join('')}
-      </tbody></table></div></div>` : '';
+    // (Stacked, not a table: on a phone a table's last column — the buttons — was scrolled out of sight.)
+    const offersCard = offers.length ? `<div class="card"><h2>Offers to you<span class="right muted">${offers.length}</span></h2>
+      ${offers.map(o => `<div class="offer"><div class="offer-head">${chip(o.fromTeamId)} <b>${esc(teamName(o.fromTeamId))}</b> ${stratBadge(o.fromTeamId)}<span class="spacer"></span><span class="muted small">expires ${esc(fmtShort(o.expires))}</span></div>
+        <div class="trade-sides"><div><div class="section-title">They give</div>${sideHTML(o.deal, o.fromTeamId)}</div><div><div class="section-title">You give</div>${sideHTML(o.deal, me)}</div></div>
+        <div class="toolbar" style="margin:8px 0 0"><button class="btn small primary" data-act="trade-accept" data-id="${o.id}"${st.open ? '' : ' disabled'}>Accept</button> <button class="btn small" data-act="trade-edit" data-id="${o.id}">Edit</button> <button class="btn small danger" data-act="trade-decline" data-id="${o.id}">Decline</button></div></div>`).join('')}
+      </div>` : '';
 
     // The deal so far
     const selList = (org, side) => {
@@ -6277,7 +6324,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
         const why = Trade.assetProblem(s, org, { type: 'player', id: p.id }, other), on = sel.players.includes(p.id), c = p.contract;
         const cl = c && c.clauses && (c.clauses.nmc || c.clauses.ntc) ? `<span class="badge" title="Waived only to join a contender">${c.clauses.nmc ? 'NMC' : 'NTC'}</span>` : '';
         return `<tr class="${on ? 'me' : ''}"><td><input type="checkbox" data-change="trade-asset" data-side="${side}" data-kind="player" data-id="${p.id}"${on ? ' checked' : ''}${why && !on ? ` disabled title="${esc(why)}"` : ''}></td>
-          <td><span class="pos">${p.position}</span> ${plink(p)} ${cl} ${p.condition.injury ? `<span class="badge bad">Out ${p.condition.injury.daysOut}d</span>` : ''}</td><td class="num">${age(p)}</td><td>${ovr(p.ovr)}</td>
+          <td><span class="pos">${p.position}</span> ${plink(p)} ${cl} ${p.condition.injury ? `<span class="badge bad">Out ${p.condition.injury.daysOut}d</span>` : ''}${why && !on ? `<div class="muted small">${esc(why)}</div>` : ''}</td><td class="num">${age(p)}</td><td>${ovr(p.ovr)}</td>
           <td class="hide-sm"><span class="badge">${ceiling(p)}</span></td><td class="num">${c && c.type !== 'PTO' ? `${U.money(c.capHit)} × ${c.yearsRemaining}` : '<span class="muted small">unsigned</span>'}</td></tr>`;
       }).join('');
       return `<div class="toolbar" style="margin-bottom:8px">${tabs}</div><div class="scroll"><table class="t"><thead><tr><th></th><th>Player</th><th class="num">Age</th><th>OVR</th><th class="hide-sm">Ceiling</th><th class="num">Contract</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="muted">Nobody here.</td></tr>'}</tbody></table></div>`;
@@ -6287,7 +6334,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
 
     // Shop a player
     const shopPlayers = [...team(me).roster.nhl, ...team(me).roster.ahl, ...team(me).roster.reserve].map(P).filter(p => !Trade.assetProblem(s, me, { type: 'player', id: p.id })).sort((a, b) => b.ovr - a.ovr);
-    const shop = ui.shop && ui.shop.date === s.calendar.date ? ui.shop : null;
+    const shop = ui.shop && ui.shop.date === s.calendar.date && ui.shop.trades === s.history.trades.length ? ui.shop : null;   // a trade since makes them stale
     const shopCard = `<div class="card"><h2>Shop a player<span class="right muted">each team's best offer</span></h2>
       <div class="toolbar"><select id="shopSel">${shopPlayers.map(p => `<option value="${p.id}"${shop && shop.playerId === p.id ? ' selected' : ''}>${esc(p.position)} ${esc(Select.fullName(p))} (${p.ovr})</option>`).join('')}</select>
         <button class="btn" data-act="shop"${st.open && shopPlayers.length ? '' : ' disabled'}>Find offers</button></div>
@@ -6784,7 +6831,11 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
     }),
     'trade-suggest': () => guarded(() => {
       const sug = Game.suggestTrade(currentDeal());
-      if (!sug) { toast(`The ${team(partnerId()).name} won't make that deal for anything you can offer.`, 'bad'); return; }
+      if (!sug) {
+        const rule = Game.evaluateTrade(currentDeal()).problems.find(p => !/ over the cap$/.test(p));   // a rule, not their price
+        toast(rule ? `No deal is possible: ${rule}.` : `The ${team(partnerId()).name} won't make that deal for anything you can offer.`, 'bad');
+        return;
+      }
       const before = ui.trade.mine.players.length + ui.trade.mine.picks.length;
       loadDeal(sug);
       const added = ui.trade.mine.players.length + ui.trade.mine.picks.length - before;
@@ -6796,19 +6847,20 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
     shop: () => guarded(() => {
       const el = document.getElementById('shopSel');
       if (!el || !el.value) return;
-      ui.shop = { playerId: el.value, date: S().calendar.date, offers: Game.shopPlayer(el.value) };
+      ui.shop = { playerId: el.value, date: S().calendar.date, trades: S().history.trades.length, offers: Game.shopPlayer(el.value) };
       if (!ui.shop.offers.length) toast(`No offers for ${Select.fullName(P(el.value))}.`);
     }),
     'shop-load': d => { const o = ui.shop && ui.shop.offers[Number(d.i)]; if (o) { loadDeal(o.deal); window.scrollTo(0, 0); } render(); },
     'trade-for': d => {
+      syncTrade();
       const p = P(d.id);
       if (!p.teamId || p.teamId === user()) return;
       if (ui.tradePartner !== p.teamId) { ui.tradePartner = p.teamId; ui.trade.theirs = { players: [], picks: [], retain: {} }; }
       if (!ui.trade.theirs.players.includes(p.id)) ui.trade.theirs.players.push(p.id);
       ui.view = 'trade'; closeModal(); render(); window.scrollTo(0, 0);
     },
-    'trade-add': d => { if (!ui.trade.mine.players.includes(d.id)) ui.trade.mine.players.push(d.id); ui.view = 'trade'; closeModal(); render(); window.scrollTo(0, 0); },
-    'trade-shop': d => { ui.view = 'trade'; closeModal(); guarded(() => { ui.shop = { playerId: d.id, date: S().calendar.date, offers: Game.shopPlayer(d.id) }; }); window.scrollTo(0, 0); },
+    'trade-add': d => { syncTrade(); if (!ui.trade.mine.players.includes(d.id)) ui.trade.mine.players.push(d.id); ui.view = 'trade'; closeModal(); render(); window.scrollTo(0, 0); },
+    'trade-shop': d => { syncTrade(); ui.view = 'trade'; closeModal(); guarded(() => { ui.shop = { playerId: d.id, date: S().calendar.date, trades: S().history.trades.length, offers: Game.shopPlayer(d.id) }; }); window.scrollTo(0, 0); },
     slot: d => onSlot(d.key),
     'reset-lines': () => { Game.resetLines(user()); toast('Auto lines restored.'); render(); },
     'swap-goalies': () => {

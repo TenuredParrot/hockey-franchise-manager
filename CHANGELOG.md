@@ -5,6 +5,32 @@ the notes on the GitHub repository page and on that version's GitHub Release, so
 changes to the game. Each entry is `## <version> — <YYYY-MM-DD>`, then a one-paragraph summary (used in the version
 history table), then the details.
 
+## 0.1.1 — 2026-11-11
+
+Fixes for the trade system. "What would it take?" now finds deals for stars, offers from other teams can be
+accepted on a phone, and the trade screen no longer shows out-of-date players. Saves from 0.1.0 carry on as they
+are.
+
+**Fixed**
+- **"What would it take?" for stars.** It now finds a deal for about three in four players rated 85 or higher, up
+  from about half. Before, it often said a team "won't make that deal for anything you can offer" when a fair package
+  existed. It used to build your side from one asset or from cheap ones, which never add up to a star. Now it also
+  tries the assets the other team values most, then drops anything they'd accept without, so it doesn't overcharge
+  you. Its packages also respect both teams' salary caps and contract limits and keep two goalies on your roster.
+  Real refusals remain: a no-trade clause, injured reserve, or a franchise player a contender won't move.
+- **Accepting offers on a phone.** Offers from other teams showed their Accept, Edit and Decline buttons in a table
+  column that was scrolled off the side of the screen. Each offer is now a card with its buttons underneath.
+- **"Shop a player" after a trade.** Its results stayed on screen after you made a trade, and "Load" could load
+  players who had already moved. The results now clear when a trade happens.
+- **Starting another game.** The trade screen kept the previous game's selections and shop results, which then
+  pointed at different players in the new league. It now starts empty for each game you start, load or import.
+- **Why a player can't be traded.** The reason (no-trade clause, injured reserve, waivers, pending free agent) only
+  appeared as a hover tooltip, which phones don't show. It's now written under the player's name.
+- **When no deal is possible because of a rule,** such as a team needing to keep two goalies, "What would it
+  take?" now says which rule.
+
+AI teams trade with each other exactly as in 0.1.0.
+
 ## 0.1.0 — 2026-11-11
 
 The first public test build: the complete game through development phase 6. You run an NHL-style franchise through

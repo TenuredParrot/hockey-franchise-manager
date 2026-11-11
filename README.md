@@ -1,6 +1,6 @@
 # Hockey Franchise Manager
 
-**▶ Play the latest version (0.1.0): https://tenuredparrot.github.io/hockey-franchise-manager/**
+**▶ Play the latest version (0.1.1): https://tenuredparrot.github.io/hockey-franchise-manager/**
 
 A hockey general-manager sim that runs in the browser on a computer, tablet or phone, with nothing to install. This
 is a test build of a game that's still being made, updated now and then. The version you're playing is in the
@@ -10,13 +10,42 @@ browser tab's title and in [`version.json`](version.json).
 
 | Version | Released | What it is |
 |---|---|---|
-| [**0.1.0**](https://github.com/TenuredParrot/hockey-franchise-manager/releases/tag/v0.1.0) (current) | 2026-11-11 | The first public test build: the complete game through development phase 6. You run an NHL-style franchise through full seasons and offseasons, against AI general managers who trade, draft and sign players on their own. |
+| [**0.1.1**](https://github.com/TenuredParrot/hockey-franchise-manager/releases/tag/v0.1.1) (current) | 2026-11-11 | Fixes for the trade system. "What would it take?" now finds deals for stars, offers from other teams can be accepted on a phone, and the trade screen no longer shows out-of-date players. Saves from 0.1.0 carry on as they are. |
+| [**0.1.0**](https://github.com/TenuredParrot/hockey-franchise-manager/releases/tag/v0.1.0) | 2026-11-11 | The first public test build: the complete game through development phase 6. You run an NHL-style franchise through full seasons and offseasons, against AI general managers who trade, draft and sign players on their own. |
 
 Each version has a page on [**Releases**](https://github.com/TenuredParrot/hockey-franchise-manager/releases) with its full notes and a download of that version: the
 whole game as one HTML file. Open it in a browser to play that version offline. Downloaded copies keep their saves
 apart from the website's. [CHANGELOG.md](CHANGELOG.md) has every version's notes in one place.
 
-## What's in 0.1.0
+## What's new in 0.1.1
+
+Fixes for the trade system. "What would it take?" now finds deals for stars, offers from other teams can be
+accepted on a phone, and the trade screen no longer shows out-of-date players. Saves from 0.1.0 carry on as they
+are.
+
+**Fixed**
+- **"What would it take?" for stars.** It now finds a deal for about three in four players rated 85 or higher, up
+  from about half. Before, it often said a team "won't make that deal for anything you can offer" when a fair package
+  existed. It used to build your side from one asset or from cheap ones, which never add up to a star. Now it also
+  tries the assets the other team values most, then drops anything they'd accept without, so it doesn't overcharge
+  you. Its packages also respect both teams' salary caps and contract limits and keep two goalies on your roster.
+  Real refusals remain: a no-trade clause, injured reserve, or a franchise player a contender won't move.
+- **Accepting offers on a phone.** Offers from other teams showed their Accept, Edit and Decline buttons in a table
+  column that was scrolled off the side of the screen. Each offer is now a card with its buttons underneath.
+- **"Shop a player" after a trade.** Its results stayed on screen after you made a trade, and "Load" could load
+  players who had already moved. The results now clear when a trade happens.
+- **Starting another game.** The trade screen kept the previous game's selections and shop results, which then
+  pointed at different players in the new league. It now starts empty for each game you start, load or import.
+- **Why a player can't be traded.** The reason (no-trade clause, injured reserve, waivers, pending free agent) only
+  appeared as a hover tooltip, which phones don't show. It's now written under the player's name.
+- **When no deal is possible because of a rule,** such as a team needing to keep two goalies, "What would it
+  take?" now says which rule.
+
+AI teams trade with each other exactly as in 0.1.0.
+
+## Earlier versions
+
+<details><summary><b>0.1.0</b> (2026-11-11): The first public test build: the complete game through development phase 6. You run an NHL-style franchise through full seasons and offseasons, against AI general managers who trade, draft and sign players on their own.</summary>
 
 The first public test build: the complete game through development phase 6. You run an NHL-style franchise through
 full seasons and offseasons, against AI general managers who trade, draft and sign players on their own.
@@ -80,6 +109,8 @@ full seasons and offseasons, against AI general managers who trade, draft and si
   trade values go through scouting.
 - Not in this version yet: AHL playoffs, a salary cap that rises over time, three-team trades and conditional draft
   picks.
+
+</details>
 
 ## Your saves
 
