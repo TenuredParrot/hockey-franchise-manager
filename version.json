@@ -1,6 +1,8 @@
 {
   "game": "Hockey Franchise Manager",
-  "built": "2026-11-11 15:09 MST",
+  "version": "0.1.0",
+  "released": "2026-11-11",
+  "built": "2026-11-11 15:28 MST",
   "source": "d8c0a4fa03",
   "saveFormat": 6,
   "latestPhase": 6,

@@ -1,0 +1,71 @@
+# Changelog
+
+Every public version of Hockey Franchise Manager, newest first. `tools/release.py` publishes the newest entry. It puts
+the notes on the GitHub repository page and on that version's GitHub Release, so add an entry here before publishing
+changes to the game. Each entry is `## <version> — <YYYY-MM-DD>`, then a one-paragraph summary (used in the version
+history table), then the details.
+
+## 0.1.0 — 2026-11-11
+
+The first public test build: the complete game through development phase 6. You run an NHL-style franchise through
+full seasons and offseasons, against AI general managers who trade, draft and sign players on their own.
+
+**The league**
+- 32 teams in two conferences and four divisions, each with its own AHL affiliate (32 more teams).
+- An 82-game NHL schedule (72 in the AHL), then a 16-team playoff with four best-of-seven rounds.
+- A generated league of about 1,700 players with ratings, ages, contracts and careers, from a seed you can choose.
+
+**On the ice**
+- A minute-by-minute game engine calibrated to real NHL scoring, shots and save percentages.
+- Forward lines, defence pairs, power-play and penalty-kill units, and goalie rotation, set automatically or by you.
+- Box scores, period-by-period scoring, standings (division, conference and wild card), league leaders and win
+  probabilities for the next game.
+- Energy, fatigue and injuries.
+
+**Running the team**
+- **Roster moves:** call-ups and send-downs between the NHL and AHL, injured reserve and LTIR, and waivers.
+- **Salary-cap rules:** buried cap, dead cap, buyouts and cap space.
+- **Staff help:** they can handle call-ups and injured reserve, your draft picks, or re-signings and prospect
+  contracts.
+- **Inbox:** news that needs a decision, such as injuries, offers and waiver claims.
+
+**The offseason**
+- Season awards, player development and aging, and retirements.
+- The draft lottery and the draft: each class is scouted, and the sim stops when you're on the clock.
+- **Re-signing:** contract demands by term, qualifying offers and entry-level deals for prospects.
+- **Free agency** from July 1, with competing offers from other teams.
+- Training camp and a new schedule, season after season.
+
+**Trades**
+- Every AI team is a contender, a bubble team or a rebuilder, and values players, prospects and draft picks
+  accordingly.
+- **Trade builder:**
+  - a live meter showing how they'd answer
+  - retained salary (up to 50%)
+  - "What would it take?" and "Shop a player"
+- **AI general managers** trade with each other all season, busiest at the trade deadline (March 5), and send you
+  offers.
+- No-trade and no-move clauses, cap checks, and Easy / Normal / Hard trade difficulty.
+
+**League life**
+- **Scouting fog:** player ceilings are your scouts' estimate. Uncertain ones show a "?" and sharpen as players age
+  and play.
+- **League news:** trades, big signings, star injuries, hat tricks, streaks, milestones, records, awards, the draft
+  and retirements.
+- **Records:** single game, single season, team, all-time leaders, and each franchise's own records.
+- **Awards:** an MVP and an All-Star team, among the season awards.
+- **Hall of Fame:** great careers are inducted when the player retires.
+- **History:** every franchise's past seasons and championships.
+- **Veteran careers:** veterans start with estimated careers before 2026-27 (labelled "est."), so the record books
+  aren't empty on day one.
+
+**Playing**
+- Runs in any modern browser on a computer, tablet or phone, with nothing to install.
+- Autosaves after every sim. Named save slots, plus Export / Import of a `.json` file to move a game between devices.
+- Keyboard shortcuts on a computer: `d` advance a day, `n` play the next game, `w` sim a week.
+
+**Known limitations**
+- Your staff's recommendations and AI contract decisions use players' true potential; only the ceilings you see and
+  trade values go through scouting.
+- Not in this version yet: AHL playoffs, a salary cap that rises over time, three-team trades and conditional draft
+  picks.
