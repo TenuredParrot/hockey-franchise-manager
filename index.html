@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Hockey Franchise Manager 0.2.1: run an NHL-style franchise. A 32-team league, trades, the draft and free agency. Test build.">
+<meta name="description" content="Hockey Franchise Manager 0.2.2: run an NHL-style franchise. A 32-team league, trades, the draft and free agency. Test build.">
 <meta name="theme-color" content="#121821">
-<meta name="hfm-build" content="0.2.1 · built 2026-11-11 22:38 MST · c060fbde5c · save format v6">
+<meta name="hfm-build" content="0.2.2 · built 2026-11-11 23:02 MST · 87a5cb82b3 · save format v6">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%231d4f9a'/><circle cx='32' cy='32' r='21' fill='none' stroke='%23c8102e' stroke-width='4'/><ellipse cx='32' cy='36' rx='14' ry='5.5' fill='%23111316'/><rect x='18' y='30' width='28' height='6' fill='%23111316'/><ellipse cx='32' cy='30' rx='14' ry='5.5' fill='%233b4049'/></svg>">
-<title>Hockey Franchise Manager 0.2.1</title>
+<title>Hockey Franchise Manager 0.2.2</title>
 <script>
   // Collected for the headless UI smoke test (tests/browser/ui_smoke.js).
   window.__uiErrors = [];
@@ -1185,6 +1185,16 @@ const Contracts = (() => {
   const emergencyAllowance = (s, orgId) => U.sum(s.teams[orgId].roster.nhl.map(id => s.players[id]).filter(p => p.emergencyRecall && p.contract).map(p => p.contract.capHit));
   const capCeiling = (s, orgId) => C.upper + ltirRelief(s, orgId) + emergencyAllowance(s, orgId);
   const capSpace = (s, orgId) => capCeiling(s, orgId) - capPayroll(s, orgId);
+  // LTIR relief that ends this season: from players due back before the cap stops binding (the end of the playoffs,
+  // about two months after the regular season). When such a player returns his relief goes, and the team must fit
+  // him, so AI teams don't build trades or waiver claims on it (0.2.2: they did, and then couldn't fit him back).
+  function returningRelief(s, orgId) {
+    const left = U.daysBetween(s.calendar.date, U.addDays(U.seasonDate(s.calendar.season, CONFIG.calendar.NHL.end), 65));
+    return U.sum(s.teams[orgId].roster.nhl.map(id => s.players[id])
+      .filter(p => p.rosterStatus === 'LTIR' && (!p.condition.injury || p.condition.injury.daysOut <= left)).map(p => p.ltirRelief || 0));
+  }
+  // The ceiling an AI team plans lasting additions against.
+  const aiCeiling = (s, orgId) => capCeiling(s, orgId) - returningRelief(s, orgId);
 
   // ── Phase 4: when contracts start, demands, ELCs, waivers, buyouts ──
   const EARLY_OFFSEASON = ['SEASON_END', 'DRAFT', 'RE_SIGNING'];
@@ -1264,6 +1274,7 @@ const Contracts = (() => {
 
   return { maxContract, capLower, fairCap, retainedShare, activeRetained, buryAllowance, buried, callUpCost, deadCapFor, payrollFor, capPayroll, contractIn, projectedPayroll,
            replaceExpiring, capHitNow, nextDeal, contractCount, expiryStatus, nhlGamesIn, faStatus, ltirRelief, emergencyAllowance, capCeiling, capSpace,
+           returningRelief, aiCeiling,
            OFFSEASON, isOffseason, contractStart, ratedSeason, waiversApply, preferredTerm, demand, newContract, clausesFor, elc, waiverExempt, buyoutTerms };
 })();
 
@@ -3050,7 +3061,49 @@ const Roster = (() => {
     p.rosterStatus = long ? 'LTIR' : 'IR';
     log(s, date, p.rosterStatus, p, p.teamId, p.condition.injury ? p.condition.injury.type : '');
   }
-  function activate(s, p, date) { p.rosterStatus = 'ACTIVE'; delete p.ltirRelief; log(s, date, 'ACTIVATE', p, p.teamId); }
+  function activate(s, p, date) { p.rosterStatus = 'ACTIVE'; delete p.ltirRelief; delete p.ltirHold; log(s, date, 'ACTIVATE', p, p.teamId); }
+
+  // A player healthy again after LTIR comes back only when his team can fit him: his relief ends with his return,
+  // so the team needs that much cap space. Auto-managed rosters (every AI team) send down players they won't need
+  // once he's back, if that makes enough room; otherwise he stays on LTIR and the team tries again each morning.
+  // (0.2.2: he used to be activated regardless, leaving the team over its ceiling, and the waivers that followed
+  // couldn't fix it in a day — a send-down only clears the cap hit above the buried allowance.)
+  function returnFromLTIR(s, org, p, date, moves, auto) {
+    const need = (p.ltirRelief || 0) - Contracts.capSpace(s, org);
+    const plan = need <= 0 ? [] : auto ? roomFor(s, org, p, need) : null;
+    if (!plan) {
+      if (!p.ltirHold) { p.ltirHold = true; moves.push(['LTIR_HOLD', p]); }      // said once
+      return false;
+    }
+    for (const d of plan) { sendDown(s, d.id, date); moves.push([d.waivers ? 'WAIVE' : 'SEND_DOWN', d]); }
+    activate(s, p, date); moves.push(['ACTIVATE', p]);
+    return true;                     // fixNHL then calls up anyone the lineup needs, from players who fit under the cap
+  }
+  // The cap moves ensureCap would make with p back, planned before anything moves: send down a spare, or send down
+  // a player for a cheaper one from the AHL at his position (who will fit by then). Returns who goes down, or null
+  // if even eight moves don't make room.
+  function roomFor(s, org, p, need) {
+    const ready = { ...status(s, org).ready }, down = new Set(), upUsed = new Set();
+    ready[group(p)]++;
+    for (let guard = 0; guard < 8 && need > 0; guard++) {
+      let best = null;
+      for (const d of nhl(s, org).filter(x => !down.has(x.id) && isActive(x) && healthy(x) && x.contract && !x.emergencyRecall)) {
+        const save = Contracts.callUpCost(d.contract), g = group(d);
+        if (save <= 0) continue;
+        if (ready[g] > NEED[g]) { const v = save - 0.05 * 1e6 * d.ovr / 10; if (!best || v > best.v) best = { v, d, u: null, save }; }
+        for (const u of ahl(s, org).filter(x => !upUsed.has(x.id) && group(x) === g && healthy(x) && x.contract && !isPTO(x))) {
+          const net = save - Contracts.callUpCost(u.contract);
+          if (net <= 0) continue;
+          const v = net - 50_000 * Math.max(0, d.ovr - u.ovr);
+          if (!best || v > best.v) best = { v, d, u, save: net };
+        }
+      }
+      if (!best) return null;
+      down.add(best.d.id); need -= best.save;
+      if (best.u) upUsed.add(best.u.id); else ready[group(best.d)]--;
+    }
+    return need <= 0 ? [...down].map(id => s.players[id]) : null;
+  }
 
   // ── Waivers ──
   // Claim order: worst points percentage first (last season's table early in the season).
@@ -3065,7 +3118,7 @@ const Roster = (() => {
     const W = CONFIG.waivers, g = group(p);
     if (U.seasonAge(p.birthDate, s.calendar.season) > W.claimMaxAge) return false;
     if (p.contract.capHit > W.claimMaxOverpay * Contracts.fairCap(p.ovr, p.position)) return false;
-    if (Contracts.capSpace(s, org) < p.contract.capHit || Contracts.contractCount(s, org) >= R.contractMax) return false;
+    if (Contracts.aiCeiling(s, org) - Contracts.capPayroll(s, org) < p.contract.capHit || Contracts.contractCount(s, org) >= R.contractMax) return false;
     const mine = nhl(s, org).filter(x => group(x) === g && healthy(x) && isActive(x)).map(x => x.ovr).sort((a, b) => b - a);
     const weakest = mine.length >= NEED[g] ? mine[NEED[g] - 1] : 0;
     return p.ovr >= weakest + W.claimMargin;
@@ -3263,11 +3316,13 @@ const Roster = (() => {
     processWaivers(s, date, events);
     for (const t of Select.nhlTeams(s)) {
       const moves = [];
+      const auto = t.id !== user || s.settings.autoRoster !== false;
       for (const p of nhl(s, t.id)) {
         if (p.condition.injury && isActive(p) && p.condition.injury.daysOut >= CONFIG.injury.irDays) { placeOnIR(s, p, date); moves.push(['IR', p]); }
+        else if (!p.condition.injury && p.rosterStatus === 'LTIR') returnFromLTIR(s, t.id, p, date, moves, auto);
         else if (!p.condition.injury && !isActive(p)) { activate(s, p, date); moves.push(['ACTIVATE', p]); }
       }
-      if (t.id !== user || s.settings.autoRoster !== false) { fixNHL(s, t.id, date, moves, rng); ensureCap(s, t.id, date, moves); }
+      if (auto) { fixNHL(s, t.id, date, moves, rng); ensureCap(s, t.id, date, moves); }
       fixAHL(s, rng, t.id, date, moves);
       if (moves.length) refreshLines(s, t.id);
       if (t.id === user) for (const [type, p] of moves) events.push({ kind: 'ROSTER', date, type, playerId: p.id, teamId: t.id, auto: true });
@@ -3861,7 +3916,7 @@ const Offseason = (() => {
     birthDate: p.birthDate, handedness: p.handedness, retired: p.retired, draft: p.career.draft, nhlGP: p.career.nhlGP,
     ovr: p.ovr, peakOvr: Math.max(p.dev.peakOvr || 0, p.ovr), prior: p.career.prior || null, stats: p.stats.map(L => Stats.packLine(L, p.position)) });
 
-  function clearPlayerFlags(p) { for (const k of ['extension', 'qualified', 'market', 'waivers', 'ltirRelief', 'emergencyRecall']) delete p[k]; }
+  function clearPlayerFlags(p) { for (const k of ['extension', 'qualified', 'market', 'waivers', 'ltirRelief', 'ltirHold', 'emergencyRecall']) delete p[k]; }
 
   // Move a player to free agency (contract over, released, or draft rights lapsed).
   function toFA(s, p, date) {
@@ -3910,7 +3965,7 @@ const Offseason = (() => {
     for (const w of s.pending.waivers) { const p = s.players[w.playerId]; if (p) delete p.waivers; }
     s.pending.waivers = [];
     // Injured reserve is an in-season status; camp re-applies it (Roster.dailyMoves).
-    for (const p of Object.values(s.players)) { if (p.rosterStatus !== 'ACTIVE') p.rosterStatus = 'ACTIVE'; delete p.ltirRelief; delete p.emergencyRecall; }
+    for (const p of Object.values(s.players)) { if (p.rosterStatus !== 'ACTIVE') p.rosterStatus = 'ACTIVE'; delete p.ltirRelief; delete p.ltirHold; delete p.emergencyRecall; }
     // Summer development for everyone still playing (the draft class doesn't exist yet).
     const changes = [];
     for (const p of Object.values(s.players)) {
@@ -3957,7 +4012,9 @@ const Offseason = (() => {
     for (const p of Object.values(s.players)) {
       const c = p.contract;
       if (!c) continue;
-      if (c.type !== 'PTO' && (c.startSeason === undefined || c.startSeason <= old)) {
+      // The season just played counts if he was under contract for it: a deal that started by then, or a re-signing
+      // made after the season that replaced one (0.2.2: those used to skip the season, a year late to UFA).
+      if (c.type !== 'PTO' && (c.startSeason === undefined || c.startSeason <= old || c.replaces)) {
         p.career.proSeasons++;
         if (Contracts.nhlGamesIn(p, old) >= K.accrueGP) p.career.accruedSeasons++;
       }
@@ -4129,6 +4186,11 @@ const Season = (() => {
           break;
         case 'ROSTER': {
           const verbs = { CALL_UP: 'called up from the AHL', EMERGENCY_RECALL: 'recalled on an emergency basis (cap)', SEND_DOWN: 'sent down to the AHL', WAIVE: 'placed on waivers (to be sent down)', IR: 'placed on injured reserve', LTIR: 'placed on long-term injured reserve', ACTIVATE: 'activated from injured reserve', SIGN_PTO: 'signed to an AHL tryout', RELEASE: 'released from his AHL tryout', EMERGENCY_SIGN: 'signed in an emergency (no one healthy at his position)' };
+          if (e.type === 'LTIR_HOLD') {
+            const p = s.players[e.playerId], short = p ? (p.ltirRelief || 0) - Contracts.capSpace(s, user) : 0;
+            add(e, `${name(e.playerId)} is healthy but stays on LTIR`, `His LTIR relief ends when he comes back, and you don't have the cap space${short > 0 ? `: you'd be ${U.money(short)} over the ceiling` : ''}. Make room (send a player down or trade salary away) and he's activated the next morning.`, true);
+            break;
+          }
           add(e, `Roster move: ${name(e.playerId)} ${verbs[e.type]}`, 'Made automatically (auto-manage roster is on).', false);
           break;
         }
@@ -4611,7 +4673,8 @@ const Trade = (() => {
     const season = capSeason(s), out = new Set(deal.give[org].players);
     const add = deal.give[other(deal, org)].players.map(id => ({ id, level: levelOf(s, s.players[id]) }));
     const before = Contracts.payrollFor(s, org, season), after = Contracts.payrollFor(s, org, season, { out, add, retained: newRetained(s, deal) });
-    return { before, after, ceiling: inSeason(s) ? Contracts.capCeiling(s, org) : C.upper };
+    const ai = s.teams[org].controller !== 'USER';
+    return { before, after, ceiling: inSeason(s) ? (ai ? Contracts.aiCeiling(s, org) : Contracts.capCeiling(s, org)) : C.upper };
   }
   function after(s, deal, org, fn) {
     const r = s.teams[org].roster, outIds = new Set(deal.give[org].players);
@@ -5820,6 +5883,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
     const b = [];
     if (p.condition.injury) b.push(`<span class="badge bad" title="${esc(p.condition.injury.type)}">Out ${p.condition.injury.daysOut}d</span>`);
     if (p.rosterStatus === 'IR' || p.rosterStatus === 'LTIR') b.push(`<span class="badge bad">${p.rosterStatus}</span>`);
+    if (p.ltirHold) b.push('<span class="badge warn" title="Healthy, but bringing him back ends his LTIR relief and the team needs the cap space first">Healthy: needs cap room</span>');
     if (p.contract && p.contract.type === 'PTO') b.push('<span class="badge">Tryout</span>');
     if (p.emergencyRecall) b.push('<span class="badge warn">Emergency</span>');
     if (p.waivers) b.push('<span class="badge warn" title="Other teams can claim him tomorrow morning">On waivers</span>');

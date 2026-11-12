@@ -5,6 +5,31 @@ the notes on the GitHub repository page and on that version's GitHub Release, so
 changes to the game. Each entry is `## <version> — <YYYY-MM-DD>`, then a one-paragraph summary (used in the version
 history table), then the details.
 
+## 0.2.2 — 2026-11-11
+
+Two more fixes, for problems found while fixing 0.2.1. Teams no longer go over the salary cap when an injured player
+comes back from long-term injured reserve. Players re-signed after the season now get that season counted toward
+free agency. Saves from 0.2.1 and earlier carry on as they are.
+
+**Fixed**
+- **Over the cap after a player came back from LTIR.** While a player is on long-term injured reserve (LTIR), his
+  team can spend over the cap by up to his cap hit. When he was healthy again he came straight back, the extra room
+  disappeared, and a team that had used it ended up over the ceiling. It then waived up to six players in a day and
+  still wasn't compliant until the next morning. Now:
+  - **Coming back:** a player comes off LTIR only when his team can fit him. AI teams, and yours with auto-manage
+    on, first send down players they won't need once he's back, but only if that's enough.
+  - **Waiting:** otherwise he stays on LTIR, marked "Healthy: needs cap room", until there's space.
+  - **Auto-manage off:** your inbox tells you how much room to clear, and nothing is moved for you.
+  - **AI spending:** AI teams no longer spend this extra room on trades or waiver claims when the injured player is
+    due back this season.
+  - **Results:** on four test leagues over three seasons, days a team spent over its cap went from 10 to 0. Days a
+    team waived four or more players went from 77 to 14. A player kept on LTIR while healthy is rare: 3 to 7
+    across 12 league-seasons. AI teams trade about 6% less (about 54 trades a season, against about 58).
+- **Seasons not counted after re-signing.** A player re-signed between the end of the season and July 1 didn't get
+  that season counted toward his pro and accrued seasons, so he reached unrestricted free agency (and lost waiver
+  exemption) a year late. It now counts, as it does for everyone else who played the season under contract.
+  Draft picks signed in June still start counting the next season.
+
 ## 0.2.1 — 2026-11-11
 
 Fixes for the bugs an automated test fleet found in 0.2.0. Re-signing a player after the season no longer changes

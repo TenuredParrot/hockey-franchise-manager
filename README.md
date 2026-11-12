@@ -1,6 +1,6 @@
 # Hockey Franchise Manager
 
-**▶ Play the latest version (0.2.1): https://tenuredparrot.github.io/hockey-franchise-manager/**
+**▶ Play the latest version (0.2.2): https://tenuredparrot.github.io/hockey-franchise-manager/**
 
 A hockey general-manager sim that runs in the browser on a computer, tablet or phone, with nothing to install. This
 is a test build of a game that's still being made, updated now and then. The version you're playing is in the
@@ -10,7 +10,8 @@ browser tab's title and in [`version.json`](version.json).
 
 | Version | Released | What it is |
 |---|---|---|
-| [**0.2.1**](https://github.com/TenuredParrot/hockey-franchise-manager/releases/tag/v0.2.1) (current) | 2026-11-11 | Fixes for the bugs an automated test fleet found in 0.2.0. Re-signing a player after the season no longer changes this season's payroll, a seed now always starts the same league, the season's MVP is chosen correctly again, and several screens are fixed. Saves from 0.2.0 carry on as they are. |
+| [**0.2.2**](https://github.com/TenuredParrot/hockey-franchise-manager/releases/tag/v0.2.2) (current) | 2026-11-11 | Two more fixes, for problems found while fixing 0.2.1. Teams no longer go over the salary cap when an injured player comes back from long-term injured reserve. Players re-signed after the season now get that season counted toward free agency. Saves from 0.2.1 and earlier carry on as they are. |
+| [**0.2.1**](https://github.com/TenuredParrot/hockey-franchise-manager/releases/tag/v0.2.1) | 2026-11-11 | Fixes for the bugs an automated test fleet found in 0.2.0. Re-signing a player after the season no longer changes this season's payroll, a seed now always starts the same league, the season's MVP is chosen correctly again, and several screens are fixed. Saves from 0.2.0 carry on as they are. |
 | [**0.2.0**](https://github.com/TenuredParrot/hockey-franchise-manager/releases/tag/v0.2.0) | 2026-11-11 | Live games. You can now play any of your games live instead of simming it: watch it on a running clock with the score, stats and play-by-play, and pause any time to change your lines, pull your goalie, switch goalies or change how much your top lines play. Simming is unchanged, and saves from 0.1.x carry on as they are. |
 | [**0.1.1**](https://github.com/TenuredParrot/hockey-franchise-manager/releases/tag/v0.1.1) | 2026-11-11 | Fixes for the trade system. "What would it take?" now finds deals for stars, offers from other teams can be accepted on a phone, and the trade screen no longer shows out-of-date players. Saves from 0.1.0 carry on as they are. |
 | [**0.1.0**](https://github.com/TenuredParrot/hockey-franchise-manager/releases/tag/v0.1.0) | 2026-11-11 | The first public test build: the complete game through development phase 6. You run an NHL-style franchise through full seasons and offseasons, against AI general managers who trade, draft and sign players on their own. |
@@ -19,7 +20,34 @@ Each version has a page on [**Releases**](https://github.com/TenuredParrot/hocke
 whole game as one HTML file. Open it in a browser to play that version offline. Downloaded copies keep their saves
 apart from the website's. [CHANGELOG.md](CHANGELOG.md) has every version's notes in one place.
 
-## What's new in 0.2.1
+## What's new in 0.2.2
+
+Two more fixes, for problems found while fixing 0.2.1. Teams no longer go over the salary cap when an injured player
+comes back from long-term injured reserve. Players re-signed after the season now get that season counted toward
+free agency. Saves from 0.2.1 and earlier carry on as they are.
+
+**Fixed**
+- **Over the cap after a player came back from LTIR.** While a player is on long-term injured reserve (LTIR), his
+  team can spend over the cap by up to his cap hit. When he was healthy again he came straight back, the extra room
+  disappeared, and a team that had used it ended up over the ceiling. It then waived up to six players in a day and
+  still wasn't compliant until the next morning. Now:
+  - **Coming back:** a player comes off LTIR only when his team can fit him. AI teams, and yours with auto-manage
+    on, first send down players they won't need once he's back, but only if that's enough.
+  - **Waiting:** otherwise he stays on LTIR, marked "Healthy: needs cap room", until there's space.
+  - **Auto-manage off:** your inbox tells you how much room to clear, and nothing is moved for you.
+  - **AI spending:** AI teams no longer spend this extra room on trades or waiver claims when the injured player is
+    due back this season.
+  - **Results:** on four test leagues over three seasons, days a team spent over its cap went from 10 to 0. Days a
+    team waived four or more players went from 77 to 14. A player kept on LTIR while healthy is rare: 3 to 7
+    across 12 league-seasons. AI teams trade about 6% less (about 54 trades a season, against about 58).
+- **Seasons not counted after re-signing.** A player re-signed between the end of the season and July 1 didn't get
+  that season counted toward his pro and accrued seasons, so he reached unrestricted free agency (and lost waiver
+  exemption) a year late. It now counts, as it does for everyone else who played the season under contract.
+  Draft picks signed in June still start counting the next season.
+
+## Earlier versions
+
+<details><summary><b>0.2.1</b> (2026-11-11): Fixes for the bugs an automated test fleet found in 0.2.0. Re-signing a player after the season no longer changes this season's payroll, a seed now always starts the same league, the season's MVP is chosen correctly again, and several screens are fixed. Saves from 0.2.0 carry on as they are.</summary>
 
 Fixes for the bugs an automated test fleet found in 0.2.0. Re-signing a player after the season no longer changes
 this season's payroll, a seed now always starts the same league, the season's MVP is chosen correctly again, and
@@ -60,7 +88,7 @@ several screens are fixed. Saves from 0.2.0 carry on as they are.
 - **Inbox order.** A message could appear under older ones: the staff's re-signings, dated the day after the draft,
   appeared below the draft's own messages. The inbox is now newest first by date.
 
-## Earlier versions
+</details>
 
 <details><summary><b>0.2.0</b> (2026-11-11): Live games. You can now play any of your games live instead of simming it: watch it on a running clock with the score, stats and play-by-play, and pause any time to change your lines, pull your goalie, switch goalies or change how much your top lines play. Simming is unchanged, and saves from 0.1.x carry on as they are.</summary>
 
