@@ -7,8 +7,8 @@ history table), then the details.
 
 ## 0.2.2 — 2026-11-11
 
-Two more fixes, for problems found while fixing 0.2.1. Teams no longer go over the salary cap when an injured player
-comes back from long-term injured reserve. Players re-signed after the season now get that season counted toward
+Fixes for the salary cap and contracts. Teams no longer go over the salary cap when an injured player comes back
+from long-term injured reserve. Players re-signed after the season now get that season counted toward
 free agency. Saves from 0.2.1 and earlier carry on as they are.
 
 **Fixed**
@@ -22,9 +22,6 @@ free agency. Saves from 0.2.1 and earlier carry on as they are.
   - **Auto-manage off:** your inbox tells you how much room to clear, and nothing is moved for you.
   - **AI spending:** AI teams no longer spend this extra room on trades or waiver claims when the injured player is
     due back this season.
-  - **Results:** on four test leagues over three seasons, days a team spent over its cap went from 10 to 0. Days a
-    team waived four or more players went from 77 to 14. A player kept on LTIR while healthy is rare: 3 to 7
-    across 12 league-seasons. AI teams trade about 6% less (about 54 trades a season, against about 58).
 - **Seasons not counted after re-signing.** A player re-signed between the end of the season and July 1 didn't get
   that season counted toward his pro and accrued seasons, so he reached unrestricted free agency (and lost waiver
   exemption) a year late. It now counts, as it does for everyone else who played the season under contract.
@@ -32,7 +29,7 @@ free agency. Saves from 0.2.1 and earlier carry on as they are.
 
 ## 0.2.1 — 2026-11-11
 
-Fixes for the bugs an automated test fleet found in 0.2.0. Re-signing a player after the season no longer changes
+Bug fixes for 0.2.0. Re-signing a player after the season no longer changes
 this season's payroll, a seed now always starts the same league, the season's MVP is chosen correctly again, and
 several screens are fixed. Saves from 0.2.0 carry on as they are.
 
@@ -57,8 +54,8 @@ several screens are fixed. Saves from 0.2.0 carry on as they are.
   ask was rounded to the nearest $25K, which was sometimes just under what he'd accept, and it's now rounded up. A
   player who wants 8 years was listed as "× 8", which only his last team can offer. The list now quotes the longest
   term you can offer, and the offer dialog says so.
-- **Hovered buttons.** A blue button under the mouse turned white with white text. This was seen on Draft right
-  after a pick and on Propose trade. The label now stays readable.
+- **Hovered buttons.** A blue button under the mouse turned white with white text, for example Draft right
+  after a pick and Propose trade. The label now stays readable.
 - **Draft tab after the draft.** It still said the draft was coming and showed "Your 2027 picks: No picks" above the
   players you had just drafted. It now says the draft is over and shows next year's picks. The "Staff handle my
   contracts every summer" option is now also on the Draft tab, as well as on Contracts.
