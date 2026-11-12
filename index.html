@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Hockey Franchise Manager 0.2.0: run an NHL-style franchise. A 32-team league, trades, the draft and free agency. Test build.">
+<meta name="description" content="Hockey Franchise Manager 0.2.1: run an NHL-style franchise. A 32-team league, trades, the draft and free agency. Test build.">
 <meta name="theme-color" content="#121821">
-<meta name="hfm-build" content="0.2.0 · built 2026-11-11 16:29 MST · 1f3e35a552 · save format v6">
+<meta name="hfm-build" content="0.2.1 · built 2026-11-11 22:38 MST · c060fbde5c · save format v6">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%231d4f9a'/><circle cx='32' cy='32' r='21' fill='none' stroke='%23c8102e' stroke-width='4'/><ellipse cx='32' cy='36' rx='14' ry='5.5' fill='%23111316'/><rect x='18' y='30' width='28' height='6' fill='%23111316'/><ellipse cx='32' cy='30' rx='14' ry='5.5' fill='%233b4049'/></svg>">
-<title>Hockey Franchise Manager 0.2.0</title>
+<title>Hockey Franchise Manager 0.2.1</title>
 <script>
   // Collected for the headless UI smoke test (tests/browser/ui_smoke.js).
   window.__uiErrors = [];
@@ -17,7 +17,7 @@
 <style>
   :root {
     --bg: #eef0f3; --panel: #ffffff; --panel-2: #f6f7f9; --ink: #1a1e24; --ink-2: #444d59; --ink-3: #6f7a88;
-    --line: #dfe3e8; --line-2: #eceff2; --accent: #2457d6; --accent-soft: #e8eefc; --accent-ink: #ffffff;
+    --line: #dfe3e8; --line-2: #eceff2; --accent: #2457d6; --accent-2: #1c47b5; --accent-soft: #e8eefc; --accent-ink: #ffffff;
     --good: #1d7f46; --good-soft: #e4f4ea; --bad: #c0392b; --bad-soft: #fbe9e7; --warn: #a8690c; --warn-soft: #fdf1dc;
     --top: #121821; --top-ink: #e9edf2; --top-ink-2: #9aa6b6;
     --o90: #6a3dcc; --o85: #2457d6; --o80: #13815a; --o75: #4d8b2a; --o70: #a8790c; --o65: #b5561e; --o60: #7c8796;
@@ -27,14 +27,14 @@
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #0d1015; --panel: #161a21; --panel-2: #1b2028; --ink: #e7eaee; --ink-2: #b6bec9; --ink-3: #87919e;
-      --line: #2a313b; --line-2: #222831; --accent: #6d93ff; --accent-soft: #1d2740; --accent-ink: #0d1015;
+      --line: #2a313b; --line-2: #222831; --accent: #6d93ff; --accent-2: #8eabff; --accent-soft: #1d2740; --accent-ink: #0d1015;
       --good: #4cc07e; --good-soft: #15281d; --bad: #f0786a; --bad-soft: #2d1714; --warn: #e3a64a; --warn-soft: #2b2113;
       --top: #0a0d11; --shadow: none; color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
     --bg: #0d1015; --panel: #161a21; --panel-2: #1b2028; --ink: #e7eaee; --ink-2: #b6bec9; --ink-3: #87919e;
-    --line: #2a313b; --line-2: #222831; --accent: #6d93ff; --accent-soft: #1d2740; --accent-ink: #0d1015;
+    --line: #2a313b; --line-2: #222831; --accent: #6d93ff; --accent-2: #8eabff; --accent-soft: #1d2740; --accent-ink: #0d1015;
     --good: #4cc07e; --good-soft: #15281d; --bad: #f0786a; --bad-soft: #2d1714; --warn: #e3a64a; --warn-soft: #2b2113;
     --top: #0a0d11; --shadow: none; color-scheme: dark;
   }
@@ -48,6 +48,7 @@
   .small { font-size: 12px; }
   .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .nowrap { white-space: nowrap; }
+  .wrap { white-space: normal; overflow-wrap: anywhere; }   /* long text inside a .num cell (which doesn't wrap) */
   .hidden { display: none !important; }
 
   /* ── top bar ── */
@@ -93,6 +94,8 @@
   .btn { appearance: none; border: 1px solid var(--line); background: var(--panel); border-radius: 7px; padding: 6px 12px; cursor: pointer; font-weight: 600; font-size: 13px; white-space: nowrap; }
   .btn:hover:not(:disabled) { background: var(--panel-2); }
   .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  /* The plain hover above is more specific than .btn.primary; without this a hovered primary button went white-on-white. */
+  .btn.primary:hover:not(:disabled), .btn.primary:active:not(:disabled) { background: var(--accent-2); border-color: var(--accent-2); color: var(--accent-ink); }
   .btn.small { padding: 2px 8px; font-size: 12px; font-weight: 600; }
   .btn.danger { color: var(--bad); }
   .btn:disabled { opacity: .45; cursor: not-allowed; }
@@ -106,6 +109,10 @@
   table.t th.num { text-align: right; }
   table.t tr.me td { background: var(--accent-soft); }
   table.t tr.cut td { border-bottom: 2px dashed var(--ink-3); }
+  table.t.saves { table-layout: fixed; }
+  table.t.saves td.save-name { overflow-wrap: anywhere; }
+  table.t.saves td.save-name b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  table.t.saves td.save-acts { width: 136px; padding-left: 4px; }
   table.t tr.sub td { background: var(--panel-2); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); }
   table.t td.rk { color: var(--ink-3); width: 1%; }
 
@@ -1095,12 +1102,30 @@ const Contracts = (() => {
   const callUpCost = c => c.capHit - buried(c);              // what a call-up adds to the payroll
   const deadCapFor = (t, season) => U.sum(t.finances.deadCap.filter(d => d.fromSeason <= season && season <= d.toSeason).map(d => d.amount));
 
-  // The contract a player will be on in `season` (an in-season extension replaces an expiring deal).
+  // The contract a player will be on in `season` (an in-season extension replaces an expiring deal). A deal signed
+  // after the season ends replaces the expiring one at once but starts next season: until July 1 this league
+  // year's payroll still counts the deal it replaced (kept as `replaces`).
   const contractIn = (p, season) => {
-    if (p.contract && p.contract.type !== 'PTO' && p.contract.expiresAfterSeason >= season) return p.contract;
+    const c = p.contract;
+    if (c && c.type !== 'PTO' && c.expiresAfterSeason >= season) {
+      if (c.replaces && c.startSeason > season) return c.replaces.expiresAfterSeason >= season ? c.replaces : null;
+      return c;
+    }
     if (p.extension && p.extension.expiresAfterSeason >= season) return p.extension;
     return null;
   };
+  // Put a new deal starting next season in place of the expiring one, keeping what the old one costs this season.
+  function replaceExpiring(s, p, c) {
+    const old = p.contract;
+    if (old && old.type !== 'PTO' && old.expiresAfterSeason === s.calendar.season && c.startSeason > s.calendar.season)
+      c.replaces = { type: old.type, capHit: old.capHit, expiresAfterSeason: old.expiresAfterSeason };
+    p.contract = c;
+    return c;
+  }
+  // The cap hit that counts today, and the new deal waiting for next season (an extension, or a re-signing made
+  // after the season ended), if any.
+  const capHitNow = (s, p) => { const c = contractIn(p, s.calendar.season); return c ? c.capHit : null; };
+  const nextDeal = (s, p) => p.extension || (p.contract && p.contract.replaces && p.contract.startSeason > s.calendar.season ? p.contract : null);
 
   // Payroll for `season`: the NHL roster (IR/LTIR included) at full cap hit less any share retained elsewhere, buried
   // AHL cap, dead cap and salary this team retains. For a future season, qualified RFAs count at their expected
@@ -1238,7 +1263,7 @@ const Contracts = (() => {
   }
 
   return { maxContract, capLower, fairCap, retainedShare, activeRetained, buryAllowance, buried, callUpCost, deadCapFor, payrollFor, capPayroll, contractIn, projectedPayroll,
-           contractCount, expiryStatus, nhlGamesIn, faStatus, ltirRelief, emergencyAllowance, capCeiling, capSpace,
+           replaceExpiring, capHitNow, nextDeal, contractCount, expiryStatus, nhlGamesIn, faStatus, ltirRelief, emergencyAllowance, capCeiling, capSpace,
            OFFSEASON, isOffseason, contractStart, ratedSeason, waiversApply, preferredTerm, demand, newContract, clausesFor, elc, waiverExempt, buyoutTerms };
 })();
 
@@ -2069,11 +2094,15 @@ const Sim = (() => {
     return { computedOn: date, off: off / n, def: def / n, sq: sq / n, g: g / n, disc: disc / n, so: so / n };
   }
 
+  const normsFresh = (cur, date) => cur && Math.abs(U.daysBetween(cur.computedOn, date)) < S.normsMaxAgeDays;
   function ensureNorms(s, league, date) {
-    const cur = s.norms[league];
-    if (!cur || Math.abs(U.daysBetween(cur.computedOn, date)) >= S.normsMaxAgeDays) s.norms[league] = computeNorms(s, league, date);
+    if (!normsFresh(s.norms[league], date)) s.norms[league] = computeNorms(s, league, date);
     return s.norms[league];
   }
+  // The same norms without storing them, for read-only questions (the win-probability preview). Storing them there
+  // let opening the dashboard decide WHEN the league's norms were refreshed, so the same seed played out
+  // differently depending on which screens were open (fixed in 0.2.1).
+  const peekNorms = (s, league, date) => (normsFresh(s.norms[league], date) ? s.norms[league] : computeNorms(s, league, date));
 
   // ── the engine ────────────────────────────────────────────────────────────
   // A match advances one minute at a time (or the whole shootout) with step(). simulate() steps to the end at once;
@@ -2322,7 +2351,7 @@ const Sim = (() => {
   // ── closed-form pre-game win probability (BLUEPRINT §3.3) ─────────────────
   function winProbability(s, homeId, awayId, date = s.calendar.date, type = 'REG') {
     const league = s.teams[homeId].league;
-    const N = ensureNorms(s, league, date);
+    const N = peekNorms(s, league, date);
     const H = aggregates(buildSide(s, homeId, date, type)), A = aggregates(buildSide(s, awayId, date, type));
     const xg = (X, Y, venue) => {
       const fin = S.baseSh * X.fin * Math.exp(S.kShooter * (X.sq - N.sq)) * Math.exp(-S.kGoalie * (Y.g - N.g));
@@ -2528,10 +2557,12 @@ const Stats = (() => {
     ].filter(a => a.teamId || a.playerId);
   }
 
-  // MVP (Phase 6): points per 82 games, weighted by how good his team was (60+ GP).
+  // MVP (Phase 6): points per 82 games, weighted by how good his team was (60+ GP). Points are derived (goals +
+  // assists): the season totals don't store them, and reading totals.pts made every score NaN, so the "MVP" was
+  // whoever sorted first by id (fixed in 0.2.1).
   function mvp(s, season, pts) {
     const pct = id => { const r = s.teams[id] && s.teams[id].record; return r && r.gp ? r.pts / (2 * r.gp) : 0.5; };
-    return pts.filter(r => r.totals.gp >= 60).map(r => ({ ...r, value: Math.round(r.totals.pts / r.totals.gp * 82 * (0.85 + 0.3 * pct(r.teamIds[r.teamIds.length - 1]))) }))
+    return pts.filter(r => r.totals.gp >= 60).map(r => ({ ...r, value: Math.round(DERIVED.pts(r.totals) / r.totals.gp * 82 * (0.85 + 0.3 * pct(r.teamIds[r.teamIds.length - 1]))) }))
       .sort((a, b) => b.value - a.value || (a.playerId < b.playerId ? -1 : 1));
   }
   // All-Star team (Phase 6): the best C, LW, RW (points), two D (points + half their plus/minus) and G (save % with
@@ -3539,9 +3570,13 @@ const Market = (() => {
   const decay = (s, p) => Math.max(M.floor, 1 - M.decayPerDay * daysOn(s, p));
   // A free agent's ask for `years` (before how he feels about the team making the offer).
   const ask = (s, p, years) => U.clamp(U.roundTo(Contracts.demand(s, p, years, { market: true }) * decay(s, p), C.rounding), C.minSalary, Contracts.maxContract());
-  // The cap hit `org` must offer for him to accept `years`.
-  const askFrom = (s, p, org, years, table = strengthTable(s)) => U.clamp(U.roundTo(ask(s, p, years) / appeal(s, p, org, table), C.rounding), C.minSalary, Contracts.maxContract());
+  // The cap hit `org` must offer for him to accept `years`: rounded UP to the cap's step, so an offer of exactly
+  // this passes acceptable() (rounding to the nearest step left about half of these "below his ask").
+  const askFrom = (s, p, org, years, table = strengthTable(s)) => U.clamp(Math.ceil(ask(s, p, years) / appeal(s, p, org, table) / C.rounding - 1e-9) * C.rounding, C.minSalary, Contracts.maxContract());
+  // Longest deal `org` can offer: 8 years to stay with his last team, 7 anywhere else.
   const maxTerm = (p, org) => (p.lastTeamId === org ? C.maxTermResign : C.maxTermFA);
+  // The term his ask is quoted at for `org`: his preferred term, within what `org` can offer.
+  const offerTerm = (s, p, org) => Math.min(Contracts.preferredTerm(s, p), maxTerm(p, org));
   const aiTerm = (s, p, start = Contracts.contractStart(s)) => {
     const age = U.seasonAge(p.birthDate, start), cap = A.maxTermByAge.find(([a]) => age <= a)[1];
     return Math.max(1, Math.min(cap, Contracts.preferredTerm(s, p, start)));
@@ -3699,7 +3734,7 @@ const Market = (() => {
     const problem = reSignProblem(s, p, years);
     if (problem) throw new Error(problem);
     const start = s.calendar.season + 1, c = Contracts.newContract(reSignPrice(s, p, years), years, start, Contracts.clausesFor(s, p, years, start));
-    if (Contracts.contractStart(s) === start) p.contract = c; else p.extension = c;
+    if (Contracts.contractStart(s) === start) Contracts.replaceExpiring(s, p, c); else p.extension = c;
     delete p.qualified;
     log(s, date, 'RE_SIGN', p, p.teamId, `${U.money(c.capHit)} × ${years}`);
     events.push({ kind: 'RE_SIGN', date, playerId: p.id, teamId: p.teamId, capHit: c.capHit, years });
@@ -3728,7 +3763,7 @@ const Market = (() => {
         const price = Contracts.demand(s, p, years, { start }), room = C.upper - A.reserve - payroll;
         const sane = price <= A.overpayLimit * Contracts.fairCap(p.ovr, p.position) || price <= A.depthMaxAsk || p.dev.potential >= 72;
         if (sane && price <= room && (status === 'RFA' || willing(s, p, table))) {
-          p.contract = Contracts.newContract(price, years, start, Contracts.clausesFor(s, p, years, start));
+          Contracts.replaceExpiring(s, p, Contracts.newContract(price, years, start, Contracts.clausesFor(s, p, years, start)));
           log(s, date, 'RE_SIGN', p, org, `${U.money(price)} × ${years}`);
           events.push({ kind: 'RE_SIGN', date, playerId: p.id, teamId: org, capHit: price, years, auto: true });
         } else if (status === 'RFA') {
@@ -3805,7 +3840,7 @@ const Market = (() => {
     }
   }
 
-  return { strength, groupsOf, gainOf, orgDepth, strengthTable, appeal, willing, ask, askFrom, maxTerm, aiTerm, offersFor, committed,
+  return { strength, groupsOf, gainOf, orgDepth, strengthTable, appeal, willing, ask, askFrom, maxTerm, offerTerm, aiTerm, offersFor, committed,
            offerProblem, offer, withdraw, acceptable, decide, aiOffers, tick, reSignProblem, reSignPrice, reSign, wantsToKeep, aiReSign, recommend,
            signProspect, prospectReady, aiSignProspects, depthFill, sign, isOpen };
 })();
@@ -3927,7 +3962,7 @@ const Offseason = (() => {
         if (Contracts.nhlGamesIn(p, old) >= K.accrueGP) p.career.accruedSeasons++;
       }
       if (c.type === 'PTO') { toFA(s, p, date); continue; }
-      if (c.expiresAfterSeason >= season) { c.yearsRemaining = c.expiresAfterSeason - season + 1; continue; }
+      if (c.expiresAfterSeason >= season) { delete c.replaces; c.yearsRemaining = c.expiresAfterSeason - season + 1; continue; }
       if (p.extension) { p.contract = p.extension; delete p.extension; p.contract.yearsRemaining = p.contract.expiresAfterSeason - season + 1; continue; }
       if (p.qualified && Contracts.faStatus(s, p) === 'RFA') {
         const capHit = U.clamp(U.roundTo(Contracts.demand(s, p, 1, { start: season }) * K.arbitration, C.rounding), C.minSalary, Contracts.maxContract());
@@ -5768,6 +5803,19 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
     const color = e >= 80 ? 'var(--good)' : e >= 60 ? 'var(--warn)' : 'var(--bad)';
     return `<span class="energy" title="Energy ${Math.round(e)}"><i style="width:${Math.max(4, e)}%;background:${color}"></i></span>`;
   };
+  // An award's number: save % for the goalie awards, nothing if it isn't a number (saves from 0.2.0 and earlier
+  // stored the MVP's score as NaN, which comes back from JSON as null).
+  const awardValue = a => (typeof a.value !== 'number' || !Number.isFinite(a.value) ? '' : a.key === 'GOALIE' || a.key === 'ALLSTAR_G' ? pct3(a.value) : a.value);
+  // This season's payroll against the one ceiling every screen (and the trade check) uses: the cap, raised in-season
+  // by LTIR relief and emergency recalls, with the raise spelled out.
+  const capLine = (s, org) => {
+    const c = Contracts.capCeiling(s, org), up = CONFIG.cap.upper;
+    return `<b>${U.money(Contracts.capPayroll(s, org))}</b> <span class="muted">of ${U.money(c)}${c > up ? ` ceiling (${U.money(up)} cap + ${U.money(c - up)} LTIR relief)` : ''}</span>`;
+  };
+  // Inbox order: newest date first, and within a day the latest message first. (One day's messages can carry two
+  // dates — the draft's last picks and the re-signings when the window opens the next morning — and were shown in
+  // the order they were written, which put a Jun 27 message under Jun 26 ones.)
+  const newestFirst = list => [...list].reverse().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   const statusBadges = p => {
     const b = [];
     if (p.condition.injury) b.push(`<span class="badge bad" title="${esc(p.condition.injury.type)}">Out ${p.condition.injury.daysOut}d</span>`);
@@ -5776,6 +5824,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
     if (p.emergencyRecall) b.push('<span class="badge warn">Emergency</span>');
     if (p.waivers) b.push('<span class="badge warn" title="Other teams can claim him tomorrow morning">On waivers</span>');
     if (p.extension) b.push(`<span class="badge good" title="Signed through ${seasonLabel(p.extension.expiresAfterSeason)}">Extended ${U.money(p.extension.capHit)} × ${p.extension.yearsRemaining}</span>`);
+    else if (Contracts.nextDeal(S(), p)) b.push(`<span class="badge good" title="Starts ${seasonLabel(p.contract.startSeason)}, signed through ${seasonLabel(p.contract.expiresAfterSeason)}">Re-signed ${U.money(p.contract.capHit)} × ${p.contract.yearsRemaining}</span>`);
     return b.join(' ');
   };
   const seg = (key, options, current) => `<div class="seg">${options.map(([v, label]) =>
@@ -5927,14 +5976,14 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
 
     // Awards
     const aw = s.history.awards.find(a => a.season === statSeason());
-    if (aw) cols[2].push(`<div class="card"><h2>Season awards</h2><table class="t"><tbody>${aw.list.map(a => `<tr><td class="muted small">${esc(a.name)}</td><td>${a.playerId ? `${plink(P(a.playerId))} ${(a.teamIds || []).map(chip).join(' ')}` : `${chip(a.teamId)} ${esc(teamName(a.teamId))}`}</td><td class="num">${a.value !== undefined ? (a.key === 'GOALIE' ? pct3(a.value) : a.value) : ''}</td></tr>`).join('')}</tbody></table></div>`);
+    if (aw) cols[2].push(`<div class="card"><h2>Season awards</h2><table class="t"><tbody>${aw.list.map(a => `<tr><td class="muted small">${esc(a.name)}</td><td>${a.playerId ? `${plink(P(a.playerId))} ${(a.teamIds || []).map(chip).join(' ')}` : `${chip(a.teamId)} ${esc(teamName(a.teamId))}`}</td><td class="num">${awardValue(a)}</td></tr>`).join('')}</tbody></table></div>`);
 
     // Around the league (Phase 6 news feed)
     const news = [...(s.news || [])].reverse().slice(0, 7);
     cols[2].push(`<div class="card"><h2>Around the league<span class="right"><a data-act="view" data-view="news">All news →</a></span></h2>${news.length ? news.map(newsItem).join('') : '<p class="muted">No news yet.</p>'}</div>`);
 
     // Inbox
-    const msgs = [...s.inbox].reverse().slice(0, 6);
+    const msgs = newestFirst(s.inbox).slice(0, 6);
     cols[2].push(`<div class="card"><h2>Inbox<span class="right"><a data-act="view" data-view="inbox">All messages →</a></span></h2>${msgs.length ? msgs.map(msgHTML).join('') : '<p class="muted">No messages yet.</p>'}</div>`);
 
     // League leaders
@@ -6003,7 +6052,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
     const st = Roster.status(s, org);
     const early = ['SEASON_END', 'DRAFT', 'RE_SIGNING'].includes(s.calendar.phase);
     const summary = `<div class="card" style="margin-bottom:14px"><div class="toolbar" style="margin:0">
-      <span>Payroll <b>${U.money(Contracts.capPayroll(s, org))}</b> <span class="muted">of ${U.money(Contracts.capCeiling(s, org))} ceiling</span></span>
+      <span>Payroll ${capLine(s, org)}</span>
       <span>Cap space <b>${U.money(Math.max(0, Contracts.capSpace(s, org)))}</b></span>
       ${early ? `<span>Next season committed <b>${U.money(Contracts.projectedPayroll(s, org, s.calendar.season + 1))}</b></span>` : ''}
       <span>Active roster <b>${st.active}/${CONFIG.roster.nhlMax}</b></span>
@@ -6038,6 +6087,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
       const c = p.contract;
       if (!c) return tab === 'RES' ? `<td class="num muted">${p.career.draft ? `#${p.career.draft.overall} · ${p.career.draft.year}` : ''}</td><td class="num">${rightsNote(p)}</td>` : '<td class="num muted">unsigned</td><td></td>';
       if (c.type === 'PTO') return '<td class="num muted">tryout</td><td></td>';
+      if (Contracts.nextDeal(s, p) === c) return `<td class="num">${U.money(Contracts.capHitNow(s, p))}</td><td class="num">1</td>`;   // re-signed: his old deal runs to June 30
       const last = c.expiresAfterSeason === s.calendar.season && !p.extension;
       return `<td class="num">${U.money(c.capHit)}${c.type === 'ELC' ? ' <span class="muted small">ELC</span>' : ''}</td><td class="num">${c.yearsRemaining}${last ? ` <span class="badge${early ? ' warn' : ''}">${Contracts.faStatus(s, p)}</span>` : ''}</td>`;
     };
@@ -6239,7 +6289,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
   // Inbox
   // ════════════════════════════════════════════════════════════════════════
   function inboxHTML() {
-    const s = S(), list = [...s.inbox].reverse().filter(m => ui.inboxFilter === 'all' || !m.read);
+    const s = S(), list = newestFirst(s.inbox).filter(m => ui.inboxFilter === 'all' || !m.read);
     return `<div class="toolbar">${seg('inboxFilter', [['all', 'All'], ['unread', 'Unread']], ui.inboxFilter)}<span class="spacer"></span>
       <button class="btn" data-act="mark-read">Mark all read</button></div>
       <div class="card">${list.length ? list.map(msgHTML).join('') : '<p class="muted">Nothing here.</p>'}</div>`;
@@ -6259,11 +6309,15 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
     const s = S(), me = user(), d = s.draft;
     const live = d && !d.finished;
     if (!live) {
-      const year = s.calendar.season + 1;
+      // From the end of the draft to July 1 this league year's draft is over, so the next one is a year later.
+      const last = d && d.finished ? d : null, over = !!last && last.year === s.calendar.season + 1;
+      const year = s.calendar.season + 1 + (over ? 1 : 0);
       const mine = Select.picksOwnedBy(s, me).filter(pk => pk.year === year).sort((a, b) => a.round - b.round);
       const table = Stats.standings(s, 'NHL', 'league'), rank = table.length - table.findIndex(r => r.teamId === me);
-      const last = d && d.finished ? d : null;
-      return `<div class="banner acc">The ${year} draft is in late June, after the playoffs. The class is revealed (and the lottery drawn) when the season ends.</div>
+      const made = over ? last.picks.filter(pk => pk.teamId === me).length : 0;
+      return `<div class="banner acc">${over
+        ? `The ${last.year} draft is complete: you made ${made} pick${made === 1 ? '' : 's'}. Sign them to entry-level deals from Contracts (or let their rights run while they develop). The ${year} draft is next June.`
+        : `The ${year} draft is in late June, after the playoffs. The class is revealed (and the lottery drawn) when the season ends.`}</div>
         <div class="grid wide">
           <div class="card"><h2>Your ${year} picks</h2><table class="t"><tbody>${mine.map(pk => `<tr><td>Round ${pk.round}</td><td>${pk.originalTeamId === me ? 'Own pick' : `via ${chip(pk.originalTeamId)}`}</td></tr>`).join('') || '<tr><td class="muted">No picks.</td></tr>'}</tbody></table>
             ${s.calendar.phase === 'REGULAR_SEASON' ? `<p class="muted small">On today's standings you'd pick around #${rank} in each round (lottery aside).</p>` : ''}</div>
@@ -6285,6 +6339,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
     const made = d.picks.filter(pk => pk.playerId).slice(-12).reverse();
     return `${status}
       <div class="toolbar"><label class="small"><input type="checkbox" data-change="auto-draft"${s.settings.autoDraft ? ' checked' : ''}> Let my staff make my picks</label>
+        <label class="small" title="The same setting as on the Contracts page: the re-signing window opens the day after the draft"><input type="checkbox" data-change="auto-contracts"${s.settings.autoContracts ? ' checked' : ''}> Staff handle my contracts every summer</label>
         <span class="muted small">Ceilings are your scouts' read; rankings are the consensus board.</span></div>
       <div class="grid wide">
         <div class="card"><h2>Big board<span class="right muted">${d.pool.length} available</span></h2><div class="scroll"><table class="t"><thead><tr><th></th><th>Prospect</th><th class="num">Age</th><th>OVR</th><th>Ceiling</th><th class="hide-sm">Profile</th><th></th></tr></thead><tbody>
@@ -6307,7 +6362,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
     const nextSeason = season + 1;
     const committed = Contracts.projectedPayroll(s, me, nextSeason);
     const head = `<div class="card"><div class="toolbar" style="margin:0">
-      <span>This season <b>${U.money(Contracts.capPayroll(s, me))}</b> <span class="muted">of ${U.money(CONFIG.cap.upper)}</span></span>
+      <span>This season ${capLine(s, me)}</span>
       <span>${seasonLabel(nextSeason)} committed <b>${U.money(committed)}</b> <span class="muted">(${U.money(Math.max(0, CONFIG.cap.upper - committed))} free)</span></span>
       <span>Contracts <b>${Contracts.contractCount(s, me)}/${CONFIG.roster.contractMax}</b></span><span class="spacer"></span>
       <label class="small"><input type="checkbox" data-change="auto-contracts"${s.settings.autoContracts ? ' checked' : ''}> Staff handle my contracts every summer</label></div></div>`;
@@ -6323,7 +6378,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
         <td class="num hide-sm">${U.money(p.contract.capHit)}</td><td><span class="badge">${st}</span></td><td>${willing}</td><td class="hide-sm">${keep}</td>
         <td class="num nowrap">${U.money(askNow)} × ${pref}</td><td class="num nowrap">${qual} <button class="btn small" data-act="resign" data-id="${p.id}"${problem && /test free agency|last year|expired|already/.test(problem) ? ` disabled title="${esc(problem)}"` : ''}>Re-sign…</button></td></tr>`;
     };
-    const extended = [...t.roster.nhl, ...t.roster.ahl].map(P).filter(p => p.extension);
+    const extended = [...t.roster.nhl, ...t.roster.ahl].map(P).filter(p => Contracts.nextDeal(s, p)).map(p => [p, Contracts.nextDeal(s, p)]);
     const prospects = t.roster.reserve.map(P).sort((a, b) => b.dev.potential - a.dev.potential);
     const dead = t.finances.deadCap.filter(x => x.toSeason >= season);
     return `${head}
@@ -6332,7 +6387,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
           ? 'Re-sign anyone you want to keep before July 1. RFAs you <b>qualify</b> but don\'t sign get a one-year arbitration award; everyone else becomes a free agent. <a data-act="staff-contracts">Apply staff recommendations</a>.'
           : 'Players in the last year of their deals. A re-signing now is an extension that starts next season; RFA qualifying offers are made after the season.'}</p>
         ${list.length ? `<div class="scroll"><table class="t"><thead><tr><th>Player</th><th class="num">Age</th><th>OVR</th><th class="hide-sm">Ceiling</th><th class="num hide-sm">Cap hit</th><th>Status</th><th>Mood</th><th class="hide-sm">Staff</th><th class="num">Asking</th><th></th></tr></thead><tbody>${list.map(row).join('')}</tbody></table></div>` : '<p class="muted">Nobody.</p>'}</div>
-      ${extended.length ? `<div class="card"><h2>Extensions (start next season)</h2><table class="t"><tbody>${extended.map(p => `<tr><td>${plink(p)}</td><td class="num">${U.money(p.extension.capHit)} × ${p.extension.yearsRemaining}</td><td class="muted small">through ${seasonLabel(p.extension.expiresAfterSeason)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+      ${extended.length ? `<div class="card"><h2>${inWindow ? 'Re-signed' : 'Extensions'} (start ${seasonLabel(nextSeason)})</h2><p class="muted small" style="margin-top:0">These count from next season. This season's payroll keeps each player's current cap hit until July 1.</p><div class="scroll"><table class="t"><tbody>${extended.map(([p, c]) => `<tr><td>${plink(p)}</td><td class="num nowrap">${U.money(c.capHit)} × ${c.yearsRemaining}</td><td class="muted small nowrap">now ${U.money(Contracts.capHitNow(s, p))}</td><td class="muted small">through ${seasonLabel(c.expiresAfterSeason)}</td></tr>`).join('')}</tbody></table></div></div>` : ''}
       <div class="card"><h2>Unsigned draft picks<span class="right muted">${prospects.length}</span></h2>
         <p class="muted small" style="margin-top:0">Rights last until the league year a prospect turns ${CONFIG.draft.rightsUntilAge}. Signing one uses an entry-level contract and a contract slot; he joins your AHL roster.</p>
         ${prospects.length ? `<div class="scroll"><table class="t"><thead><tr><th>Prospect</th><th class="num">Age</th><th>OVR</th><th>Ceiling</th><th class="hide-sm">Drafted</th><th class="hide-sm">Plays</th><th class="hide-sm"></th><th></th></tr></thead><tbody>${prospects.map(p => {
@@ -6363,7 +6418,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
     const fas = Select.freeAgents(s).filter(inGroup).sort((a, b) => b.ovr - a.ovr || a.id.localeCompare(b.id));
     const n = ui.faShow || 50;
     const row = p => {
-      const pref = Contracts.preferredTerm(s, p), askMe = Market.askFrom(s, p, me, pref, table), offers = Market.offersFor(s, p.id);
+      const pref = Market.offerTerm(s, p, me), askMe = Market.askFrom(s, p, me, pref, table), offers = Market.offersFor(s, p.id);
       const myOffer = offers.find(o => o.teamId === me);
       return `<tr class="${myOffer ? 'me' : ''}"><td><span class="pos">${p.position}</span> ${plink(p)}</td><td class="num">${age(p)}</td><td>${ovr(p.ovr)}</td><td class="hide-sm"><span class="badge">${ceiling(p)}</span></td>
         <td class="hide-sm">${p.lastTeamId ? chip(p.lastTeamId) : '<span class="muted small">—</span>'}</td><td class="num nowrap">${U.money(askMe)} × ${pref}</td>
@@ -6657,7 +6712,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
     const cap = ui.offerCap !== undefined && ui.offerCap !== null ? ui.offerCap : st.mine && st.mine.years === yrs ? st.mine.capHit : ask;
     const space = Contracts.capSpace(s, me) - Market.committed(s, me, id);
     return `<div class="card"><div class="matchup">${ovr(p.ovr)}<div><b>${esc(Select.fullName(p))}</b> <span class="pos">${p.position}</span> · age ${age(p)} · ceiling ${ceiling(p)}
-        <div class="muted small">${p.lastTeamId ? `Last played for ${chip(p.lastTeamId)} · ` : ''}prefers ${pref} year${pref > 1 ? 's' : ''} · ${st.offers} offer${st.offers === 1 ? '' : 's'} so far${st.decideOn ? ` · decides ${esc(fmtDate(st.decideOn))}` : ''}</div></div></div></div>
+        <div class="muted small">${p.lastTeamId ? `Last played for ${chip(p.lastTeamId)} · ` : ''}prefers ${pref} year${pref > 1 ? 's' : ''}${pref > opts.length ? ` (the most you can offer is ${opts.length})` : ''} · ${st.offers} offer${st.offers === 1 ? '' : 's'} so far${st.decideOn ? ` · decides ${esc(fmtDate(st.decideOn))}` : ''}</div></div></div></div>
       <div class="card"><h2>What he's asking from you</h2><table class="t"><thead><tr><th>Term</th><th class="num">Cap hit</th><th class="num">Total</th><th></th></tr></thead><tbody>
         ${opts.map(o => `<tr class="${o.years === yrs ? 'me' : ''}"><td>${o.years} year${o.years > 1 ? 's' : ''}${o.years === pref ? ' <span class="badge acc">preferred</span>' : ''}</td><td class="num">${U.money(o.capHit)}</td><td class="num muted">${U.money(o.capHit * o.years)}</td>
           <td class="num"><button class="btn small" data-act="offer-term" data-years="${o.years}">Choose</button></td></tr>`).join('')}</tbody></table></div>
@@ -6673,7 +6728,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
         <div class="muted small">Now ${U.money(p.contract.capHit)} through ${seasonLabel(p.contract.expiresAfterSeason)}. ${inSeason ? 'An extension starts next season.' : 'The new deal starts next season.'}</div></div></div></div>
       <div class="card"><table class="t"><thead><tr><th>Term</th><th class="num">Cap hit</th><th class="num">Total</th><th></th></tr></thead><tbody>
         ${opts.map(o => `<tr><td>${o.years} year${o.years > 1 ? 's' : ''}${o.years === pref ? ' <span class="badge acc">preferred</span>' : ''}</td><td class="num">${U.money(o.capHit)}</td><td class="num muted">${U.money(o.capHit * o.years)}</td>
-          <td class="num">${o.problem ? `<span class="muted small">${esc(o.problem)}</span>` : `<button class="btn small primary" data-act="resign-sign" data-id="${id}" data-years="${o.years}">Sign</button>`}</td></tr>`).join('')}</tbody></table></div>`;
+          <td class="num">${o.problem ? `<span class="muted small wrap">${esc(o.problem)}</span>` : `<button class="btn small primary" data-act="resign-sign" data-id="${id}" data-years="${o.years}">Sign</button>`}</td></tr>`).join('')}</tbody></table></div>`;
   }
   function confirmHTML({ text, act, id, label }) {
     return `<p>${text}</p><div class="toolbar" style="margin:0"><span class="spacer"></span><button class="btn" data-act="close">Cancel</button><button class="btn primary" data-act="${act}" data-id="${id}">${esc(label)}</button></div>`;
@@ -6779,7 +6834,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
     const d = p.career.draft;
     const statsTable = careerTable(p);
     const where2 = p.assignment === 'PROSPECT' ? '<span class="badge">Draft-eligible prospect</span>' : p.assignment === 'JUNIOR' || p.assignment === 'EUROPE' ? `${chip(p.teamId)} <span class="badge">Unsigned draft pick · ${p.assignment === 'EUROPE' ? 'Europe' : 'junior'}</span>` : where;
-    const contractRows = c ? `<dl class="kv"><dt>Type</dt><dd>${c.type === 'PTO' ? 'AHL tryout' : c.type.replace('_', '-')}</dd>${c.type !== 'PTO' ? `<dt>Cap hit</dt><dd>${U.money(c.capHit)}</dd><dt>Years left</dt><dd>${c.yearsRemaining} (through ${seasonLabel(c.expiresAfterSeason)})</dd>
+    const contractRows = c ? `<dl class="kv"><dt>Type</dt><dd>${c.type === 'PTO' ? 'AHL tryout' : c.type.replace('_', '-')}</dd>${c.type !== 'PTO' ? `<dt>Cap hit</dt><dd>${Contracts.nextDeal(s, p) === c ? `${U.money(Contracts.capHitNow(s, p))} this season, then <b>${U.money(c.capHit)}</b> from ${seasonLabel(c.startSeason)}` : U.money(c.capHit)}</dd><dt>Years left</dt><dd>${c.yearsRemaining} (through ${seasonLabel(c.expiresAfterSeason)})</dd>
         <dt>At expiry</dt><dd>${c.expiresAfterSeason === s.calendar.season ? Contracts.faStatus(s, p) : Contracts.expiryStatus(s, p)}</dd>
         <dt>Waivers</dt><dd>${p.waivers ? '<span class="badge warn">On waivers now</span>' : Contracts.waiverExempt(p) ? 'Exempt' : 'Required to send down'}</dd>` : ''}
         ${p.extension ? `<dt>Extension</dt><dd>${U.money(p.extension.capHit)} × ${p.extension.yearsRemaining} from ${seasonLabel(p.extension.startSeason)}</dd>` : ''}
@@ -6815,12 +6870,14 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
   function savesHTML() {
     const list = ui.saves;
     const s = S();
-    const rows = list === null ? '<tr><td class="muted">Loading…</td></tr>' : list.length ? list.map(x => `<tr><td><b>${esc(x.slot)}</b></td><td>${esc(x.summary.team)}</td><td class="nowrap">${esc(fmtShort(x.summary.date))} ${x.summary.season}-${String(x.summary.season + 1).slice(2)}</td>
-      <td class="muted small nowrap">${esc(new Date(x.savedAt).toLocaleString())}</td><td class="num muted small">${(x.bytes / 1048576).toFixed(1)} MB</td>
-      <td class="num nowrap"><button class="btn small" data-act="load-slot" data-slot="${esc(x.slot)}">Load</button> <button class="btn small danger" data-act="delete-slot" data-slot="${esc(x.slot)}">Delete</button></td></tr>`).join('') : '<tr><td class="muted">No saved games yet.</td></tr>';
+    // One flexible column (the name, clamped to two lines, and the details under it) and one for the buttons, so a
+    // long name can never push Load and Delete out of the dialog.
+    const rows = list === null ? '<tr><td class="muted">Loading…</td></tr>' : list.length ? list.map(x => `<tr><td class="save-name"><b title="${esc(x.slot)}">${esc(x.slot)}</b>
+      <div class="muted small">${esc(x.summary.team)} · ${esc(fmtShort(x.summary.date))} ${x.summary.season}-${String(x.summary.season + 1).slice(2)} · saved ${esc(new Date(x.savedAt).toLocaleString())} · ${(x.bytes / 1048576).toFixed(1)} MB</div></td>
+      <td class="num nowrap save-acts"><button class="btn small" data-act="load-slot" data-slot="${esc(x.slot)}">Load</button> <button class="btn small danger" data-act="delete-slot" data-slot="${esc(x.slot)}">Delete</button></td></tr>`).join('') : '<tr><td class="muted">No saved games yet.</td></tr>';
     return `${s ? `<div class="card"><div class="toolbar" style="margin:0"><div class="field" style="flex:1"><label class="small muted" for="slotname">Save the current game as</label><input id="slotname" value="${esc(team(user()).abbrev)} ${esc(s.calendar.date)}"></div>
       <button class="btn primary" data-act="save-slot" style="align-self:end">Save</button></div><p class="muted small" style="margin:8px 0 0">The game also autosaves to <b>autosave</b> after every sim.</p></div>` : ''}
-      <div class="card"><h2>Saved games</h2><div class="scroll"><table class="t"><tbody>${rows}</tbody></table></div></div>
+      <div class="card"><h2>Saved games</h2><table class="t saves"><tbody>${rows}</tbody></table></div>
       <div class="card"><h2>Backup</h2><div class="toolbar" style="margin:0">${s ? '<button class="btn" data-act="export">Export current game (.json)</button>' : ''}<button class="btn" data-act="import">Import a .json save…</button><input id="importfile" type="file" accept=".json,application/json" class="hidden" data-change="import-file"></div></div>`;
   }
 
@@ -6831,7 +6888,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
     return `<p class="muted" style="margin:0">Pick your franchise. The league, its players and their contracts are generated from the seed.</p>
       ${Object.keys(byDiv).sort().map(k => `<div><div class="section-title">${titleCase(k.split('|')[0])} · ${titleCase(k.split('|')[1])}</div><div class="picker">${byDiv[k].map(t =>
         `<button class="pick${ui.pickTeam === t.id ? ' on' : ''}" data-act="pick" data-team="${t.id}">${tchip(t)}<span>${esc(t.city)} <b>${esc(t.name)}</b></span></button>`).join('')}</div></div>`).join('')}
-      <div class="toolbar" style="margin:0"><div class="field"><label class="small muted" for="seed">Seed (optional: same seed, same league)</label><input id="seed" placeholder="random" size="18"></div>
+      <div class="toolbar" style="margin:0"><div class="field"><label class="small muted" for="seed">Seed (optional: same seed, same league)</label><input id="seed" placeholder="random" size="18" value="${esc(ui.seedDraft || '')}"></div>
       <span class="spacer"></span><button class="btn primary" data-act="start" style="align-self:end">Start as ${esc(HFM.DATA.teams.find(t => t.id === ui.pickTeam).city)}</button></div>`;
   }
 
@@ -6922,7 +6979,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
   function queueMinute(rec) {
     const lv = LV(), m = rec.minute, snap = lv.match.snapshot(), prev = lv.recs[m - 1];
     lv.recs[m] = rec; lv.snaps[m] = snap;
-    for (let i = 0; i < 2; i++) if (rec.pulled[i] !== (prev ? prev.pulled[i] : false)) lv.queue.push({ sec: m * 60, kind: 'pull', side: i, on: rec.pulled[i] });
+    for (let i = 0; i < 2; i++) if (rec.pulled[i] !== (prev ? prev.pulled[i] : false)) lv.queue.push({ sec: m * 60, kind: 'pull', side: i, on: rec.pulled[i], period: rec.period });
     const n = rec.shots.length;
     rec.shots.forEach((sh, k) => lv.queue.push({ sec: sh.goal ? sh.goal.sec : m * 60 + Math.round((k + 1) * 60 / (n + 1)), kind: sh.goal ? 'goal' : 'shot', side: sh.side, period: rec.period, goal: sh.goal }));
     for (const p of snap.penList.slice(lv.pens)) lv.queue.push({ sec: p.sec, kind: 'pen', side: p.side, period: p.period, pen: p });
@@ -7280,7 +7337,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
     ui.view = 'dashboard'; ui.rosterTeam = null; ui.lineSel = null; ui.blockers = null;
     Game.newGame({ seed: seedVal, userTeamId: teamId });
     closeModal(); render();
-    toast(`Welcome to ${teamName(teamId)}. Training camp opens today.`);
+    toast(`Welcome to ${teamName(teamId)}. Training camp opens today. (Seed ${seedVal}: the same seed starts the same league.)`);
     await autosave();
   }
 
@@ -7400,8 +7457,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
     },
     import: () => document.getElementById('importfile').click(),
     'new-game': () => openModal('newgame'),
-    pick: d => { ui.pickTeam = d.team; if (ui.modal) renderModal(); else render(); },
-    start: () => { const el = document.getElementById('seed'); startNewGame(ui.pickTeam, el ? el.value : ''); },
+    pick: d => { const el = document.getElementById('seed'); if (el) ui.seedDraft = el.value; ui.pickTeam = d.team; if (ui.modal) renderModal(); else render(); },
+    start: () => { const el = document.getElementById('seed'); const seed = el ? el.value : ''; ui.seedDraft = ''; startNewGame(ui.pickTeam, seed); },
     continue: async () => { try { await Game.load('autosave'); render(); } catch (e) { toast(e.message, 'bad'); } },
   };
   const CHANGES = {
@@ -7435,6 +7492,9 @@ if (typeof module !== 'undefined' && module.exports) module.exports = HFM;
     if (fn) { if (el.tagName === 'A') e.preventDefault(); fn(el.dataset, el, e); }
   });
   document.addEventListener('change', e => { const el = e.target.closest('[data-change]'); if (el && CHANGES[el.dataset.change]) CHANGES[el.dataset.change](el); });
+  // The seed box is rebuilt whenever the new-game screen redraws (picking a team does that), so what's typed in it is
+  // kept here. It used to be lost when you typed the seed first: the game then started from a random seed.
+  document.addEventListener('input', e => { if (e.target.id === 'seed') ui.seedDraft = e.target.value; });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && ui.modal) { closeModal(); return; }
     if (ui.modal || !S() || e.metaKey || e.ctrlKey || e.altKey || /input|select|textarea/i.test(e.target.tagName)) return;

@@ -5,6 +5,47 @@ the notes on the GitHub repository page and on that version's GitHub Release, so
 changes to the game. Each entry is `## <version> — <YYYY-MM-DD>`, then a one-paragraph summary (used in the version
 history table), then the details.
 
+## 0.2.1 — 2026-11-11
+
+Fixes for the bugs an automated test fleet found in 0.2.0. Re-signing a player after the season no longer changes
+this season's payroll, a seed now always starts the same league, the season's MVP is chosen correctly again, and
+several screens are fixed. Saves from 0.2.0 carry on as they are.
+
+**Fixed**
+- **Re-signing after the season changed this season's payroll.** From the end of the season to July 1, a new deal
+  starts next season, but "This season" on Contracts and the cap hit on Roster jumped to the new figure at once. Re-
+  signing someone cheaper even freed up cap space you could use straight away. Now the old deal counts until July 1
+  and only next season's figures change. AI teams' re-signings work the same way. Contracts lists the new deals
+  under "Re-signed", and Roster marks the player "Re-signed".
+- **The same seed could start a different league.** If you typed the seed before picking your team, picking the team
+  emptied the seed box and the game started from a random seed. The seed now stays, and the welcome message shows
+  the seed the game started from. Separately, the dashboard's win-probability preview could make the season play out
+  differently depending on which screens you had open. It no longer does.
+- **Season awards.** The MVP's score showed as NaN, and because of that the award went to whichever player came first
+  in the list, not to the best season. The MVP is now the best points-per-game season, weighted by how good his team
+  was, as intended. The All-Star goalie's save % now reads ".924", not "0.9242738589211619". Awards from earlier
+  seasons in a 0.2.0 save stay as they were, but their missing score no longer shows as NaN.
+- **Save / Load.** With a long save name, or just once saves existed, the saved-games table was wider than the
+  dialog and pushed Load and Delete out of sight. Each save is now its name (up to two lines) with its details
+  underneath, and the buttons always stay visible.
+- **Free-agent offers.** Offering exactly a player's asking price showed "Below his ask" about half the time. The
+  ask was rounded to the nearest $25K, which was sometimes just under what he'd accept, and it's now rounded up. A
+  player who wants 8 years was listed as "× 8", which only his last team can offer. The list now quotes the longest
+  term you can offer, and the offer dialog says so.
+- **Hovered buttons.** A blue button under the mouse turned white with white text. This was seen on Draft right
+  after a pick and on Propose trade. The label now stays readable.
+- **Draft tab after the draft.** It still said the draft was coming and showed "Your 2027 picks: No picks" above the
+  players you had just drafted. It now says the draft is over and shows next year's picks. The "Staff handle my
+  contracts every summer" option is now also on the Draft tab, as well as on Contracts.
+- **Live games.** In the play-by-play, "pull the goalie" was stamped "1st 58:00". It now uses the period and clock
+  like every other entry ("3rd 18:00").
+- **Re-sign dialog.** With next season's cap nearly full, the "Not enough cap space next season" message ran out of
+  the dialog. It now wraps.
+- **Cap figures.** During the season, LTIR relief raises a team's cap ceiling. Roster and Trades used the raised
+  figure while Contracts showed the $104.0M cap. Both now show the same ceiling and say how much of it is LTIR relief.
+- **Inbox order.** A message could appear under older ones: the staff's re-signings, dated the day after the draft,
+  appeared below the draft's own messages. The inbox is now newest first by date.
+
 ## 0.2.0 — 2026-11-11
 
 Live games. You can now play any of your games live instead of simming it: watch it on a running clock with the

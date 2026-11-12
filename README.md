@@ -1,6 +1,6 @@
 # Hockey Franchise Manager
 
-**▶ Play the latest version (0.2.0): https://tenuredparrot.github.io/hockey-franchise-manager/**
+**▶ Play the latest version (0.2.1): https://tenuredparrot.github.io/hockey-franchise-manager/**
 
 A hockey general-manager sim that runs in the browser on a computer, tablet or phone, with nothing to install. This
 is a test build of a game that's still being made, updated now and then. The version you're playing is in the
@@ -10,7 +10,8 @@ browser tab's title and in [`version.json`](version.json).
 
 | Version | Released | What it is |
 |---|---|---|
-| [**0.2.0**](https://github.com/TenuredParrot/hockey-franchise-manager/releases/tag/v0.2.0) (current) | 2026-11-11 | Live games. You can now play any of your games live instead of simming it: watch it on a running clock with the score, stats and play-by-play, and pause any time to change your lines, pull your goalie, switch goalies or change how much your top lines play. Simming is unchanged, and saves from 0.1.x carry on as they are. |
+| [**0.2.1**](https://github.com/TenuredParrot/hockey-franchise-manager/releases/tag/v0.2.1) (current) | 2026-11-11 | Fixes for the bugs an automated test fleet found in 0.2.0. Re-signing a player after the season no longer changes this season's payroll, a seed now always starts the same league, the season's MVP is chosen correctly again, and several screens are fixed. Saves from 0.2.0 carry on as they are. |
+| [**0.2.0**](https://github.com/TenuredParrot/hockey-franchise-manager/releases/tag/v0.2.0) | 2026-11-11 | Live games. You can now play any of your games live instead of simming it: watch it on a running clock with the score, stats and play-by-play, and pause any time to change your lines, pull your goalie, switch goalies or change how much your top lines play. Simming is unchanged, and saves from 0.1.x carry on as they are. |
 | [**0.1.1**](https://github.com/TenuredParrot/hockey-franchise-manager/releases/tag/v0.1.1) | 2026-11-11 | Fixes for the trade system. "What would it take?" now finds deals for stars, offers from other teams can be accepted on a phone, and the trade screen no longer shows out-of-date players. Saves from 0.1.0 carry on as they are. |
 | [**0.1.0**](https://github.com/TenuredParrot/hockey-franchise-manager/releases/tag/v0.1.0) | 2026-11-11 | The first public test build: the complete game through development phase 6. You run an NHL-style franchise through full seasons and offseasons, against AI general managers who trade, draft and sign players on their own. |
 
@@ -18,7 +19,50 @@ Each version has a page on [**Releases**](https://github.com/TenuredParrot/hocke
 whole game as one HTML file. Open it in a browser to play that version offline. Downloaded copies keep their saves
 apart from the website's. [CHANGELOG.md](CHANGELOG.md) has every version's notes in one place.
 
-## What's new in 0.2.0
+## What's new in 0.2.1
+
+Fixes for the bugs an automated test fleet found in 0.2.0. Re-signing a player after the season no longer changes
+this season's payroll, a seed now always starts the same league, the season's MVP is chosen correctly again, and
+several screens are fixed. Saves from 0.2.0 carry on as they are.
+
+**Fixed**
+- **Re-signing after the season changed this season's payroll.** From the end of the season to July 1, a new deal
+  starts next season, but "This season" on Contracts and the cap hit on Roster jumped to the new figure at once. Re-
+  signing someone cheaper even freed up cap space you could use straight away. Now the old deal counts until July 1
+  and only next season's figures change. AI teams' re-signings work the same way. Contracts lists the new deals
+  under "Re-signed", and Roster marks the player "Re-signed".
+- **The same seed could start a different league.** If you typed the seed before picking your team, picking the team
+  emptied the seed box and the game started from a random seed. The seed now stays, and the welcome message shows
+  the seed the game started from. Separately, the dashboard's win-probability preview could make the season play out
+  differently depending on which screens you had open. It no longer does.
+- **Season awards.** The MVP's score showed as NaN, and because of that the award went to whichever player came first
+  in the list, not to the best season. The MVP is now the best points-per-game season, weighted by how good his team
+  was, as intended. The All-Star goalie's save % now reads ".924", not "0.9242738589211619". Awards from earlier
+  seasons in a 0.2.0 save stay as they were, but their missing score no longer shows as NaN.
+- **Save / Load.** With a long save name, or just once saves existed, the saved-games table was wider than the
+  dialog and pushed Load and Delete out of sight. Each save is now its name (up to two lines) with its details
+  underneath, and the buttons always stay visible.
+- **Free-agent offers.** Offering exactly a player's asking price showed "Below his ask" about half the time. The
+  ask was rounded to the nearest $25K, which was sometimes just under what he'd accept, and it's now rounded up. A
+  player who wants 8 years was listed as "× 8", which only his last team can offer. The list now quotes the longest
+  term you can offer, and the offer dialog says so.
+- **Hovered buttons.** A blue button under the mouse turned white with white text. This was seen on Draft right
+  after a pick and on Propose trade. The label now stays readable.
+- **Draft tab after the draft.** It still said the draft was coming and showed "Your 2027 picks: No picks" above the
+  players you had just drafted. It now says the draft is over and shows next year's picks. The "Staff handle my
+  contracts every summer" option is now also on the Draft tab, as well as on Contracts.
+- **Live games.** In the play-by-play, "pull the goalie" was stamped "1st 58:00". It now uses the period and clock
+  like every other entry ("3rd 18:00").
+- **Re-sign dialog.** With next season's cap nearly full, the "Not enough cap space next season" message ran out of
+  the dialog. It now wraps.
+- **Cap figures.** During the season, LTIR relief raises a team's cap ceiling. Roster and Trades used the raised
+  figure while Contracts showed the $104.0M cap. Both now show the same ceiling and say how much of it is LTIR relief.
+- **Inbox order.** A message could appear under older ones: the staff's re-signings, dated the day after the draft,
+  appeared below the draft's own messages. The inbox is now newest first by date.
+
+## Earlier versions
+
+<details><summary><b>0.2.0</b> (2026-11-11): Live games. You can now play any of your games live instead of simming it: watch it on a running clock with the score, stats and play-by-play, and pause any time to change your lines, pull your goalie, switch goalies or change how much your top lines play. Simming is unchanged, and saves from 0.1.x carry on as they are.</summary>
 
 Live games. You can now play any of your games live instead of simming it: watch it on a running clock with the
 score, stats and play-by-play, and pause any time to change your lines, pull your goalie, switch goalies or change
@@ -59,7 +103,7 @@ how much your top lines play. Simming is unchanged, and saves from 0.1.x carry o
   that game unplayed, ready to play again.
 - Watching a game live doesn't change anything else in the season.
 
-## Earlier versions
+</details>
 
 <details><summary><b>0.1.1</b> (2026-11-11): Fixes for the trade system. "What would it take?" now finds deals for stars, offers from other teams can be accepted on a phone, and the trade screen no longer shows out-of-date players. Saves from 0.1.0 carry on as they are.</summary>
 
