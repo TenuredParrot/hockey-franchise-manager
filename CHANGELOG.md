@@ -5,6 +5,79 @@ the notes on the GitHub repository page and on that version's GitHub Release, so
 changes to the game. Each entry is `## <version> — <YYYY-MM-DD>`, then a one-paragraph summary (used in the version
 history table), then the details.
 
+## 0.3.0 — 2026-11-13
+
+The trade deadline room, draft picks four years out, conditional picks, a regular season that stops for what
+matters, owner goals (and getting fired), a season recap with a Cup celebration, and many screen improvements. Saves
+from 0.2.x carry on as they are.
+
+**The trade deadline room**
+- **Like the draft:** on deadline day the season stops in the morning. The room is the last 15 minutes before the
+  3 PM deadline, on a live clock.
+- **Deals all the way to 3 PM:** AI teams make trades throughout, busier as the deadline gets closer, usually 10 to
+  20 in all. Each appears on a trade ticker with the time it happened.
+- **Offers to you** last 2½ minutes. Build your own deals in the trade builder while the clock runs; the top bar
+  keeps the countdown.
+- **Pause** the clock any time, or **skip to 3 PM**. When the deadline passes, trades close until the season ends.
+- **You'll see it coming:** a countdown on the dashboard, a marker on the schedule, and a reminder a week before.
+
+**Draft picks**
+- Every team now holds its picks in the coming draft and the 3 after it (it was the coming draft and the 2 after
+  it), and can trade any of them.
+- The Draft tab shows any team's picks for those four drafts: its own, where traded ones went, and the picks it has
+  acquired.
+
+**Conditional picks**
+- **Protected 1sts:** top-3, top-5 or top-10. If the pick lands in that range, its team keeps it and the other team
+  gets that team's next 1st instead, unprotected.
+- **Picks that get better:** a 2nd, 3rd or 4th in the coming draft can become a pick one round higher if its team
+  makes the playoffs, or if it wins a playoff round.
+- The pick that backs a condition is locked until the condition is settled: after the playoffs, or when the draft
+  order is set. Choose a condition on any of your own picks in the trade builder. AI teams use conditions in their
+  deals too.
+
+**The season**
+- **One set of stop rules for every sim button,** "Sim to playoffs" included. By default a sim stops for trade
+  offers, injuries to key players (out a week or more), the trade deadline, making or missing the playoffs, waiver
+  claims and signings, and with a short report at each quarter of the season. Other injuries, milestones and big
+  games can be switched on in Settings.
+- **When a sim stops,** a panel says why, links to whatever needs you, sums up the stretch just simmed (record,
+  standing, top performers, cap space) and continues to where you were going.
+- **The owner's goals:** set at training camp from your team's outlook (a playoff goal, a points target and playing
+  young players), tracked on the dashboard and graded A to F at the end of the season.
+- **Job security:** the grade moves the owner's patience. If it runs out you're fired, and you can take a job with
+  one of three teams or start a new game. Firing can be switched off in Settings.
+- **The season recap** after the final: the champion (with a celebration when it's you), your season and top
+  players, the owner's verdict, the awards, Hall of Fame inductions, records and franchise milestones.
+- **Franchise milestones** to chase are listed on the History page.
+- **Big games** (a playoff race, a division rival close by, every playoff game) are flagged on the dashboard, with
+  a prompt to play them live.
+
+**Screens**
+- **Inbox:** "Needs you" at the top (offers, the deadline room, expiring contracts, draft rights about to lapse,
+  roster problems), then messages by month, 50 at a time, with earlier seasons folded away.
+- **Tabs** that don't fit go into a "More" menu that carries their badges.
+- **Browser Back and Forward** move between screens and close dialogs; leaving the game asks first.
+- **The top bar keeps its height:** the main sim buttons, a "More" menu for the rest, and a Game menu with
+  Settings, Save / Load and New game. In the offseason it shows your cap space and when the phase ends.
+- **Toasts** sit at the bottom left, and each can be dismissed.
+- **Confirmations:** re-signing takes a second click and shows the cap space left; proposing a trade shows the deal
+  and both payrolls first; the Draft buttons pause for a moment after each pick. A disabled Propose button is
+  grey, with the reason next to it.
+- **"See what your staff recommend":** a preview of their re-signings, qualifying offers and entry-level deals, with
+  next season's cap space. Untick any before applying.
+- **Draft:** what the board's order means, sortable columns, the staff's reason for each pick they make for you, a
+  staff strategy (best available or positional need), and a note when your scouts' read of a pick changes.
+- **Free agents:** sortable columns and a filter for players who would make your lineup better.
+- **Phones and tablets:** Contracts rows become cards with a Re-sign button; Roster keeps name and cap hit in view;
+  Trades has Yours / Theirs tabs with the deal pinned; wide tables show a shadow where they scroll; full names on
+  the live-game bench.
+- The Start button stays in view on the new-game screen, and money always has two decimals ($1.00M).
+
+**Also**
+- Rebuilding AI teams no longer take players aged 30 or older as payment in a trade.
+- "Show more" on the draft board no longer loads the whole class on the second click.
+
 ## 0.2.2 — 2026-11-11
 
 Fixes for the salary cap and contracts. Teams no longer go over the salary cap when an injured player comes back

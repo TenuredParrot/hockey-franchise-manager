@@ -1,10 +1,10 @@
 {
   "game": "Hockey Franchise Manager",
-  "version": "0.2.2",
-  "released": "2026-11-11",
-  "built": "2026-11-11 23:02 MST",
-  "source": "87a5cb82b3",
-  "saveFormat": 6,
+  "version": "0.3.0",
+  "released": "2026-11-13",
+  "built": "2026-11-13 19:49 MST",
+  "source": "c049be6551",
+  "saveFormat": 7,
   "latestPhase": 6,
   "site": "https://tenuredparrot.github.io/hockey-franchise-manager/"
 }
